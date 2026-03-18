@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#09090b">
+<title>BSI Integration Tests — Remote</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #09090b; color: #e4e4e7; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; color: #f59e0b; }
+  .subtitle { font-size: 13px; color: #71717a; margin-bottom: 8px; }
+  .config { font-size: 12px; color: #52525b; margin-bottom: 20px; font-family: monospace; }
+  .config span { color: #f59e0b; }
+  .suite { margin-bottom: 24px; }
+  .suite-header { font-size: 14px; font-weight: 600; color: #a1a1aa; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #27272a; }
+  .test { font-size: 13px; padding: 4px 0; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .test.pass { color: #22c55e; }
+  .test.fail { color: #ef4444; }
+  .test.skip { color: #71717a; }
+  .test .icon { width: 16px; text-align: center; flex-shrink: 0; }
+  .test .timing { color: #52525b; font-size: 11px; margin-left: 4px; }
+  .test .msg { color: #71717a; font-size: 11px; width: 100%; margin-left: 24px; word-break: break-all; }
+  .summary { margin-top: 24px; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  .summary.all-pass { background: #052e16; color: #22c55e; border: 1px solid #166534; }
+  .summary.has-fail { background: #450a0a; color: #ef4444; border: 1px solid #991b1b; }
+  #results { max-width: 800px; }
+  .loading { color: #f59e0b; font-size: 14px; margin-top: 12px; }
+  .loading::after { content: '...'; animation: dots 1.5s steps(3) infinite; }
+  @keyframes dots { 0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; } }
+  .export-bar { margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .export-btn { background: #27272a; border: 1px solid #3f3f46; color: #f59e0b; padding: 8px 16px;
+    border-radius: 6px; font-size: 12px; cursor: pointer; font-family: monospace; transition: all 0.2s; }
+  .export-btn:hover { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
+  .export-status { font-size: 11px; color: #71717a; }
+  .banner { background: #1e1b4b; border: 1px solid #3730a3; border-radius: 8px; padding: 12px 16px;
+    margin-bottom: 20px; font-size: 13px; color: #818cf8; }
+</style>
+</head>
+<body>
+<h1>BSI Integration Tests — Remote Runner</h1>
+<div class="subtitle">Testing production apps on Cloudflare Pages — no local servers required</div>
+<div class="banner">Running against production Cloudflare Pages URLs in demo mode. All iframes are cross-origin — DOM/eval tests gracefully skip.</div>
+<div class="config" id="config-line"></div>
+<div id="results"><div class="loading" id="loading">Running tests</div></div>
+<div id="summary"></div>
+<div id="export-bar" class="export-bar" style="display:none;">
+  <button class="export-btn" onclick="postToDashboard()">POST to Dashboard</button>
+  <button class="export-btn" onclick="exportForDashboard()">Export JSON</button>
+  <span class="export-status" id="export-status"></span>
+</div>
+
+<!-- Test framework (inline to be self-contained) -->
+<script>
+// ── Inline Test Harness (from bsi-devops/tests/lib/test-harness.js) ──
+(function () {
+  'use strict';
+  const suites = [];
+  let currentSuite = null;
+
+  window.describe = function (name, fn) {
+    currentSuite = { name, tests: [] };
+    suites.push(currentSuite);
+    fn();
+    currentSuite = null;
+  };
+  window.it = function (name, fn, opts) {
+    if (!currentSuite) throw new Error('it() must be called inside describe()');
+    currentSuite.tests.push({ name, fn, opts: opts || {} });
+  };
+  window.assert = function (condition, msg) { if (!condition) throw new Error(msg || 'Assertion failed'); };
+  window.assertEqual = function (actual, expected, msg) {
+    if (actual !== expected) throw new Error((msg || 'Expected') + ': got ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected));
+  };
+  window.assertNotEqual = function (actual, notExpected, msg) {
+    if (actual === notExpected) throw new Error((msg || 'Did not expect') + ': ' + JSON.stringify(actual));
+  };
+  window.assertDeepEqual = function (actual, expected, msg) {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error((msg || 'Deep equal') + ': got ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected));
+  };
+  window.assertIncludes = function (arr, item, msg) {
+    if (!Array.isArray(arr) || !arr.includes(item)) throw new Error((msg || 'Expected array to include') + ': ' + JSON.stringify(item));
+  };
+  window.assertGreaterThan = function (actual, threshold, msg) {
+    if (!(actual > threshold)) throw new Error((msg || 'Expected greater than') + ': got ' + JSON.stringify(actual) + ', threshold ' + JSON.stringify(threshold));
+  };
+
+  window._testResults = { completed: false, totalPass: 0, totalFail: 0, totalSkip: 0, elapsed: 0, suites: [] };
+
+  window.runAll = async function (opts) {
+    opts = opts || {};
+    const filterSuite = opts.suite || null;
+    const container = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const startTime = performance.now();
+    let totalPass = 0, totalFail = 0, totalSkip = 0;
+
+    for (const suite of suites) {
+      if (filterSuite && !suite.name.toLowerCase().includes(filterSuite.toLowerCase())) {
+        totalSkip += suite.tests.length;
+        window._testResults.suites.push({ name: suite.name, tests: suite.tests.map(t => ({ name: t.name, status: 'skip', error: null, elapsed: 0 })) });
+        continue;
+      }
+      const suiteResult = { name: suite.name, tests: [] };
+      const suiteDiv = document.createElement('div'); suiteDiv.className = 'suite';
+      const header = document.createElement('div'); header.className = 'suite-header'; header.textContent = suite.name;
+      suiteDiv.appendChild(header);
+      if (container) container.appendChild(suiteDiv);
+
+      for (const test of suite.tests) {
+        const timeout = test.opts.timeout || 5000;
+        const testStart = performance.now();
+        const testDiv = document.createElement('div'); testDiv.className = 'test';
+        try {
+          const result = test.fn();
+          if (result && typeof result.then === 'function') {
+            await Promise.race([result, new Promise((_, reject) => { setTimeout(() => reject(new Error('Test timed out (' + timeout + 'ms)')), timeout); })]);
+          }
+          const elapsed = Math.round(performance.now() - testStart);
+          testDiv.className = 'test pass';
+          testDiv.innerHTML = '<span class="icon">\u2713</span> ' + test.name + ' <span class="timing">' + elapsed + 'ms</span>';
+          totalPass++; suiteResult.tests.push({ name: test.name, status: 'pass', error: null, elapsed });
+        } catch (err) {
+          const elapsed = Math.round(performance.now() - testStart);
+          testDiv.className = 'test fail';
+          testDiv.innerHTML = '<span class="icon">\u2717</span> ' + test.name + ' <span class="timing">' + elapsed + 'ms</span><br><span class="msg">' + escapeHtml(err.message) + '</span>';
+          totalFail++; suiteResult.tests.push({ name: test.name, status: 'fail', error: err.message, elapsed });
+          console.error('FAIL:', suite.name, '>', test.name, err);
+        }
+        suiteDiv.appendChild(testDiv);
+      }
+      window._testResults.suites.push(suiteResult);
+    }
+
+    const totalElapsed = Math.round(performance.now() - startTime);
+    window._testResults.completed = true;
+    window._testResults.totalPass = totalPass;
+    window._testResults.totalFail = totalFail;
+    window._testResults.totalSkip = totalSkip;
+    window._testResults.elapsed = totalElapsed;
+
+    if (summaryEl) {
+      summaryEl.className = 'summary ' + (totalFail === 0 ? 'all-pass' : 'has-fail');
+      summaryEl.textContent = totalPass + ' passed, ' + totalFail + ' failed' + (totalSkip > 0 ? ', ' + totalSkip + ' skipped' : '') + ' \u2014 ' + (totalElapsed / 1000).toFixed(1) + 's \u2014 ' + (totalFail === 0 ? 'All tests passed!' : totalFail + ' test(s) need attention');
+    }
+    return window._testResults;
+  };
+
+  function escapeHtml(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  window.wait = function (ms) { return new Promise(resolve => setTimeout(resolve, ms)); };
+  window.assertAppLoaded = function (handle, msg) {
+    assert(handle, (msg || 'App handle') + ' exists');
+    assert(handle.iframe, (msg || 'App') + ' has iframe element');
+    assert(handle.iframe.parentNode, (msg || 'App') + ' iframe is in DOM');
+  };
+})();
+</script>
+
+<!-- Inline Iframe Orchestrator -->
+<script>
+(function () {
+  'use strict';
+  const PORT_MAP = {
+    'portal': 8080, 'home': 8080, 'scrum-app': 8081, 'erp-app': 8082,
+    'req-management': 8083, 'alm-app': 8084, 'filter-design-studio-app': 8085,
+    'kinematics-studio-app': 8086, 'bambu-viewer': 8087, 'engineering-calcs-app': 8088,
+    'serial-app': 8089, 'jk-bms-app': 8090, 'forgeboard': 8091,
+    'notes-app': 8092, 'Notes_App': 8092, 'shop': 8093,
+    'label-designer-app': 8094, 'filaments-inventory': 8095,
+  };
+  const URL_MAP = {
+    'portal':              'https://blacksphereindustries.nl',
+    'home':                'https://blacksphereindustries.nl',
+    'scrum-app':           'https://scrum-app.pages.dev',
+    'erp-app':             'https://erp-app-eqo.pages.dev',
+    'req-management':      'https://req-management.pages.dev',
+    'alm-app':             'https://alm-app.pages.dev',
+    'filter-design-studio-app': 'https://filter-design-studio-app.pages.dev',
+    'kinematics-studio-app': 'https://kinematics-studio-app.pages.dev',
+    'bambu-viewer':        'https://bambu-viewer.pages.dev',
+    'engineering-calcs-app': 'https://engineering-calcs-app.pages.dev',
+    'serial-app':          'https://arnoutzw.github.io/serial-app',
+    'jk-bms-app':          'https://arnoutzw.github.io/jk-bms-app',
+    'forgeboard':          'https://forgeboard.pages.dev',
+    'notes-app':           'https://notes-app-dx3.pages.dev',
+    'Notes_App':           'https://notes-app-dx3.pages.dev',
+    'shop':                'https://shop-dgx.pages.dev',
+    'label-designer-app':  'https://label-designer-app.pages.dev',
+    'filaments-inventory': 'https://filaments-inventory.pages.dev',
+  };
+
+  class IframeOrchestrator {
+    constructor(opts) {
+      opts = opts || {};
+      this.target = opts.target || 'remote';
+      this.baseUrl = opts.baseUrl || 'http://localhost';
+      this.demoMode = opts.demoMode !== false;
+      this.handles = [];
+      this._container = null;
+    }
+    _getContainer() {
+      if (!this._container) {
+        this._container = document.getElementById('iframe-sandbox');
+        if (!this._container) {
+          this._container = document.createElement('div');
+          this._container.id = 'iframe-sandbox';
+          this._container.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1024px;height:768px;overflow:hidden;';
+          document.body.appendChild(this._container);
+        }
+      }
+      return this._container;
+    }
+    getPort(appId) { return PORT_MAP[appId] || null; }
+    getRemoteUrl(appId) { return URL_MAP[appId] || null; }
+    getUrl(appId) {
+      if (this.target === 'remote') {
+        const base = this.getRemoteUrl(appId);
+        if (!base) return null;
+        return base + '/' + (this.demoMode ? '?demo=true' : '');
+      }
+      const port = this.getPort(appId);
+      if (!port) return null;
+      return this.baseUrl + ':' + port + '/' + (this.demoMode ? '?demo=true' : '');
+    }
+    loadApp(appId) {
+      let url, origin, port;
+      if (this.target === 'remote') {
+        const base = this.getRemoteUrl(appId);
+        if (!base) return Promise.reject(new Error('Unknown app: ' + appId));
+        url = base + '/' + (this.demoMode ? '?demo=true' : '');
+        origin = base; port = 443;
+      } else {
+        port = this.getPort(appId);
+        if (!port) return Promise.reject(new Error('Unknown app: ' + appId));
+        url = this.baseUrl + ':' + port + '/' + (this.demoMode ? '?demo=true' : '');
+        origin = this.baseUrl + ':' + port;
+      }
+      return new Promise((resolve, reject) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:1024px;height:768px;border:0;';
+        iframe.setAttribute('data-app-id', appId);
+        iframe.src = url;
+        const timeoutId = setTimeout(() => { reject(new Error('Timeout loading ' + appId + ' at ' + url)); }, 20000);
+        iframe.onload = () => { clearTimeout(timeoutId); setTimeout(() => { const handle = { iframe, appId, origin, port, url }; this.handles.push(handle); resolve(handle); }, 500); };
+        iframe.onerror = () => { clearTimeout(timeoutId); reject(new Error('Failed to load ' + appId + ' at ' + url)); };
+        this._getContainer().appendChild(iframe);
+      });
+    }
+    unloadApp(handle) { if (handle && handle.iframe && handle.iframe.parentNode) handle.iframe.parentNode.removeChild(handle.iframe); this.handles = this.handles.filter(h => h !== handle); }
+    unloadAll() { for (const handle of [...this.handles]) this.unloadApp(handle); }
+    sendMessage(handle, msg) { try { handle.iframe.contentWindow.postMessage(msg, '*'); } catch (e) { throw new Error('sendMessage failed: ' + e.message); } }
+    waitForMessage(handle, type, timeout) {
+      timeout = timeout || 5000;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Timeout waiting for "' + type + '"')); }, timeout);
+        function handler(e) { if (e.data && e.data.type === type && e.source === handle.iframe.contentWindow) { clearTimeout(timer); window.removeEventListener('message', handler); resolve(e.data); } }
+        window.addEventListener('message', handler);
+      });
+    }
+    waitForAnyMessage(type, timeout) {
+      timeout = timeout || 5000;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('Timeout waiting for any "' + type + '"')); }, timeout);
+        function handler(e) { if (e.data && e.data.type === type) { clearTimeout(timer); window.removeEventListener('message', handler); resolve(e.data); } }
+        window.addEventListener('message', handler);
+      });
+    }
+    evalInApp(handle, expr) { try { return handle.iframe.contentWindow.eval(expr); } catch (e) { return undefined; } }
+    isSameOrigin(handle) { try { return !!handle.iframe.contentDocument; } catch (e) { return false; } }
+    getBodyLength(handle) { try { const doc = handle.iframe.contentDocument; return doc && doc.body ? doc.body.innerHTML.length : -1; } catch (e) { return -1; } }
+    getTheme(handle) { try { return handle.iframe.contentDocument.documentElement.getAttribute('data-theme'); } catch (e) { return null; } }
+  }
+  IframeOrchestrator.PORT_MAP = PORT_MAP;
+  IframeOrchestrator.URL_MAP = URL_MAP;
+  window.IframeOrchestrator = IframeOrchestrator;
+})();
+</script>
+
+<!-- Inline PostMessage Spy -->
+<script>
+(function () {
+  'use strict';
+  const log = [];
+  window.addEventListener('message', function (e) { if (e.data && typeof e.data === 'object') log.push({ type: e.data.type, data: e.data, origin: e.origin, ts: Date.now() }); });
+  window.PostMessageSpy = {
+    getLog: function () { return log.slice(); },
+    getMessages: function (type) { return log.filter(function (m) { return m.type === type; }); },
+    getLastMessage: function (type) { const msgs = this.getMessages(type); return msgs.length > 0 ? msgs[msgs.length - 1] : null; },
+    assertMessageSent: function (type, matcher) { const msgs = this.getMessages(type); assert(msgs.length > 0, 'Expected message "' + type + '"'); if (matcher) assert(msgs.some(function (m) { return matcher(m.data); }), 'No message "' + type + '" matched'); },
+    waitForMessage: function (type, timeout) { timeout = timeout || 5000; return new Promise(function (resolve, reject) { const start = Date.now(); (function check() { const m = log.find(function (m) { return m.type === type && m.ts >= start; }); if (m) resolve(m); else if (Date.now() - start > timeout) reject(new Error('Timeout waiting for spy message "' + type + '"')); else setTimeout(check, 50); })(); }); },
+    assertNoMessage: function (type, timeout) { timeout = timeout || 300; return new Promise(function (resolve, reject) { setTimeout(function () { var msgs = log.filter(function (m) { return m.type === type; }); if (msgs.length > 0) reject(new Error('Unexpected message "' + type + '"')); else resolve(); }, timeout); }); },
+    clear: function () { log.length = 0; },
+  };
+})();
+</script>
+
+<!-- Inline Test Suites (loaded from bsi-devops, adapted for remote) -->
+<script>
+// Force remote mode
+window._testMode = 'demo';
+window._testTarget = 'remote';
+</script>
+
+<!-- Load suites from bsi-devops on localhost:8096 if available, otherwise use inline smoke -->
+<script>
+(function () {
+  'use strict';
+
+  // ── Smoke Suite (remote) ──────────────────────────────────────────
+  const appMap = IframeOrchestrator.URL_MAP;
+  const SMOKE_APPS = Object.entries(appMap)
+    .filter(([id]) => id !== 'home')
+    .filter(([id]) => id !== 'Notes_App');
+
+  describe('Smoke — All Apps Load (Remote)', function () {
+    const orch = new IframeOrchestrator({ target: 'remote', demoMode: true });
+
+    for (const [appId, url] of SMOKE_APPS) {
+      it(appId + ' (' + url.replace('https://', '') + ') loads', async function () {
+        let handle;
+        try {
+          handle = await orch.loadApp(appId);
+          assert(handle.iframe.src.length > 10, appId + ' iframe has src');
+          assertAppLoaded(handle, appId);
+        } finally {
+          if (handle) orch.unloadApp(handle);
+        }
+      }, { timeout: 20000 });
+    }
+  });
+
+  // ── SSO Chain (remote) ────────────────────────────────────────────
+  describe('SSO — Admin Auth Chain (Remote)', function () {
+    const orch = new IframeOrchestrator({ target: 'remote', demoMode: true });
+
+    it('Portal loads and initialises', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('portal');
+        assertAppLoaded(handle, 'portal');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 20000 });
+
+    it('Child app receives admin-auth without crashing', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('scrum-app');
+        await wait(500);
+        orch.sendMessage(handle, { type: 'admin-auth', isAdmin: false, projects: [], sso: { uid: 'test', email: 'test@test.com' } });
+        await wait(1000);
+        assertAppLoaded(handle, 'scrum-app after admin-auth');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 15000 });
+
+    it('Fake admin-auth from untrusted origin handled gracefully', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('scrum-app');
+        await wait(500);
+        orch.sendMessage(handle, { type: 'admin-auth', isAdmin: true, firebaseConfig: { projectId: 'fake' }, projects: [], sso: { uid: 'hacker', email: 'h@evil.com' } });
+        await wait(500);
+        assertAppLoaded(handle, 'scrum-app after fake auth');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 15000 });
+  });
+
+  // ── Theme Propagation (remote) ────────────────────────────────────
+  describe('Theme Propagation — Remote', function () {
+    const orch = new IframeOrchestrator({ target: 'remote', demoMode: true });
+
+    it('theme-change delivered to app without crash', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('scrum-app');
+        await wait(500);
+        orch.sendMessage(handle, { type: 'theme-change', theme: 'light' });
+        await wait(500);
+        assertAppLoaded(handle, 'scrum-app after theme light');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 15000 });
+
+    it('Invalid theme values do not crash app', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('erp-app');
+        await wait(500);
+        orch.sendMessage(handle, { type: 'theme-change', theme: 'invalid' });
+        orch.sendMessage(handle, { type: 'theme-change', theme: null });
+        await wait(300);
+        assertAppLoaded(handle, 'erp-app after invalid themes');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 15000 });
+  });
+
+  // ── Regression (remote) ───────────────────────────────────────────
+  describe('Regression — Remote', function () {
+    const orch = new IframeOrchestrator({ target: 'remote', demoMode: true });
+
+    it('Malformed postMessage does not crash app', async function () {
+      let handle;
+      try {
+        handle = await orch.loadApp('scrum-app');
+        await wait(500);
+        orch.sendMessage(handle, '');
+        orch.sendMessage(handle, { type: null });
+        orch.sendMessage(handle, { type: 'unknown-type', data: {} });
+        await wait(500);
+        assertAppLoaded(handle, 'scrum-app after malformed messages');
+      } finally { orch.unloadAll(); }
+    }, { timeout: 15000 });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const suite = params.get('suite') || null;
+
+  const configEl = document.getElementById('config-line');
+  configEl.innerHTML = 'mode=<span>demo</span> | target=<span>remote</span> | apps=<span>Cloudflare Pages</span>' +
+    (suite ? ' | suite=<span>' + suite + '</span>' : ' | suite=<span>all</span>');
+
+  const DASHBOARD_URL = location.origin;
+
+  setTimeout(async () => {
+    const loading = document.getElementById('loading');
+    try { await runAll({ suite }); } catch (err) {
+      console.error('[runner] Fatal error:', err);
+      if (loading) loading.textContent = 'Fatal error: ' + err.message;
+    }
+    if (loading && loading.parentNode) loading.parentNode.removeChild(loading);
+    document.getElementById('export-bar').style.display = 'flex';
+  }, 100);
+
+  window.postToDashboard = async function () {
+    const status = document.getElementById('export-status');
+    status.textContent = 'Submitting...';
+    const r = window._testResults;
+    const totalTests = r.totalPass + r.totalFail + r.totalSkip;
+    const payload = {
+      timestamp: new Date().toISOString(),
+      mode: 'demo', runner: 'integration-remote', hostname: location.hostname,
+      completed: r.completed, totalPass: r.totalPass, totalFail: r.totalFail,
+      totalSkip: r.totalSkip, totalTests: totalTests, elapsed: r.elapsed,
+      passRate: totalTests > 0 ? Math.round((r.totalPass / totalTests) * 1000) / 10 : 0,
+      suites: r.suites.map(function (s) {
+        return { name: s.name, totalTests: s.tests.length,
+          pass: s.tests.filter(function (t) { return t.status === 'pass'; }).length,
+          fail: s.tests.filter(function (t) { return t.status === 'fail'; }).length,
+          skip: s.tests.filter(function (t) { return t.status === 'skip'; }).length,
+          tests: s.tests };
+      }),
+      manifestVersion: 'unknown', manifestDate: 'unknown', manifest: null,
+    };
+    payload.id = payload.timestamp.replace(/[:.]/g, '-') + '_v' + payload.manifestVersion + '_' + payload.mode;
+    try {
+      const resp = await fetch(DASHBOARD_URL + '/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const result = await resp.json();
+      status.textContent = resp.ok ? 'Submitted! ID: ' + result.id : 'Error: ' + (result.error || resp.status);
+    } catch (e) { status.textContent = 'Error: ' + e.message; }
+  };
+
+  window.exportForDashboard = async function () {
+    const status = document.getElementById('export-status');
+    const r = window._testResults;
+    const totalTests = r.totalPass + r.totalFail + r.totalSkip;
+    const payload = {
+      timestamp: new Date().toISOString(), mode: 'demo', runner: 'integration-remote',
+      completed: r.completed, totalPass: r.totalPass, totalFail: r.totalFail,
+      totalSkip: r.totalSkip, totalTests: totalTests, elapsed: r.elapsed,
+      passRate: totalTests > 0 ? Math.round((r.totalPass / totalTests) * 1000) / 10 : 0,
+      suites: r.suites.map(function (s) { return { name: s.name, totalTests: s.tests.length, pass: s.tests.filter(function (t) { return t.status === 'pass'; }).length, fail: s.tests.filter(function (t) { return t.status === 'fail'; }).length, skip: s.tests.filter(function (t) { return t.status === 'skip'; }).length, tests: s.tests }; }),
+    };
+    payload.id = payload.timestamp.replace(/[:.]/g, '-') + '_remote_demo';
+    const json = JSON.stringify(payload, null, 2);
+    try { await navigator.clipboard.writeText(json); status.textContent = 'Copied to clipboard!'; } catch (e) { status.textContent = 'Downloading...'; }
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = payload.id + '.json'; a.click();
+  };
+})();
+</script>
+</body>
+</html>
