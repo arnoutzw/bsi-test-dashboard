@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#09090b">
+<title>BSI Test Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg-body: #09090b; --bg-primary: #18181b; --bg-secondary: #27272a;
+    --bg-hover: #3f3f46; --text-primary: #f4f4f5; --text-secondary: #d4d4d8;
+    --text-muted: #71717a; --accent: #f59e0b; --accent-hover: #fbbf24;
+    --border: #3f3f46; --border-light: #27272a;
+  }
+  [data-theme="light"] {
+    --bg-body: #ffffff; --bg-primary: #ffffff; --bg-secondary: #f8f9fb;
+    --bg-hover: #e8eaf0; --text-primary: #081249; --text-secondary: #2b2a3e;
+    --text-muted: #555570; --accent: #10069f; --accent-hover: #1297e4;
+    --border: #e2e5f0; --border-light: #e8eaf0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg-body); color: var(--text-primary); }
+  code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+  .nav-link { color: var(--text-muted); transition: color 0.2s; cursor: pointer; }
+  .nav-link:hover, .nav-link.active { color: var(--accent); }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+  .badge-amber { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .badge-green { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-zinc { background: rgba(161,161,170,0.15); color: #a1a1aa; }
+  .badge-purple { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .badge-red { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; background: var(--bg-secondary); color: var(--text-muted);
+    font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  th:hover { color: var(--accent); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); }
+  tr:hover td { background: var(--bg-secondary); }
+
+  details { border: 1px solid var(--border-light); border-radius: 8px; margin-bottom: 8px; background: var(--bg-secondary); }
+  details summary { padding: 12px 16px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary);
+    list-style: none; display: flex; align-items: center; gap: 8px; }
+  details summary::before { content: '\25B8'; color: var(--accent); transition: transform 0.2s; display: inline-block; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details > div { padding: 0 16px 16px; }
+
+  .filter-btn { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+    transition: all 0.2s; }
+  .filter-btn:hover, .filter-btn.active { background: rgba(245,158,11,0.15); color: var(--accent);
+    border-color: var(--accent); }
+
+  .search-input { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; color: var(--text-primary); font-size: 13px; font-family: 'JetBrains Mono', monospace;
+    width: 100%; outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .stat-card { background: var(--bg-primary); border: 1px solid var(--border-light); border-radius: 8px; padding: 20px; }
+  .stat-value { font-size: 32px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+  .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .summary-bar { padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  .summary-pass { background: #052e16; color: #22c55e; border: 1px solid #166534; }
+  .summary-fail { background: #450a0a; color: #ef4444; border: 1px solid #991b1b; }
+  [data-theme="light"] .summary-pass { background: #dcfce7; color: #166534; border-color: #86efac; }
+  [data-theme="light"] .summary-fail { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+  .test-row { font-size: 13px; padding: 4px 0; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .test-pass { color: #22c55e; }
+  .test-fail { color: #ef4444; }
+  .test-skip { color: #71717a; }
+  .test-icon { width: 16px; text-align: center; flex-shrink: 0; }
+  .test-timing { color: #52525b; font-size: 11px; margin-left: 4px; }
+  .test-error { color: #71717a; font-size: 11px; width: 100%; margin-left: 24px; word-break: break-all; font-family: 'JetBrains Mono', monospace; }
+
+  .rate-green { color: #4ade80; }
+  .rate-amber { color: #f59e0b; }
+  .rate-red { color: #f87171; }
+
+  .coverage-cell { width: 28px; height: 28px; border-radius: 4px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 600; }
+  .coverage-yes { background: rgba(34,197,94,0.2); color: #4ade80; }
+  .coverage-no { background: rgba(161,161,170,0.08); color: #52525b; }
+
+  .event-item { padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }
+  .event-item:last-child { border-bottom: none; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: none;
+    align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; }
+
+  .heatmap-cell { width: 24px; height: 24px; border-radius: 3px; display: inline-block; margin: 1px; }
+  .heatmap-pass { background: #166534; }
+  .heatmap-fail { background: #991b1b; }
+  .heatmap-skip { background: #27272a; }
+
+  .sidebar { position: fixed; top: 0; left: 0; width: 240px; height: 100vh; background: var(--bg-primary);
+    border-right: 1px solid var(--border-light); padding: 24px 16px; overflow-y: auto; z-index: 50; }
+  .main-content { margin-left: 240px; padding: 32px 48px; max-width: 1100px; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 1px solid var(--border-light); }
+    .main-content { margin-left: 0; padding: 16px; }
+  }
+
+  .clickable-row { cursor: pointer; }
+  .clickable-row:hover td { background: var(--bg-hover) !important; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
+    <div style="width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+      <i data-lucide="flask-conical" style="width:18px;height:18px;color:#09090b;"></i>
+    </div>
+    <div>
+      <div class="mono" style="font-weight:700;font-size:14px;">BSI Tests</div>
+      <div style="font-size:10px;color:var(--text-muted);" class="mono" id="sidebar-version">loading...</div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:2px;" id="nav">
+    <a class="nav-link active" onclick="showSection('overview', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="layout-dashboard" style="width:14px;height:14px;"></i> Overview</a>
+    <a class="nav-link" onclick="showSection('runs', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="list" style="width:14px;height:14px;"></i> Runs</a>
+    <a class="nav-link" onclick="showSection('detail', this)" id="nav-detail" style="padding:8px 12px;border-radius:6px;font-size:13px;display:none;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="file-text" style="width:14px;height:14px;"></i> Run Detail</a>
+    <a class="nav-link" onclick="showSection('manifest', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="package" style="width:14px;height:14px;"></i> Manifest</a>
+    <a class="nav-link" onclick="showSection('coverage', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="grid-3x3" style="width:14px;height:14px;"></i> Coverage Map</a>
+    <a class="nav-link" onclick="showSection('trends', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="trending-up" style="width:14px;height:14px;"></i> Trends</a>
+    <a class="nav-link" onclick="showSection('settings', this)" style="padding:8px 12px;border-radius:6px;font-size:13px;display:flex;align-items:center;gap:8px;text-decoration:none;">
+      <i data-lucide="settings" style="width:14px;height:14px;"></i> Settings</a>
+  </div>
+
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border-light);">
+    <button onclick="toggleTheme()" style="width:100%;padding:8px;border-radius:6px;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-muted);font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <i data-lucide="sun-moon" style="width:14px;height:14px;"></i> Toggle Theme
+    </button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+<!-- ═══════════════ OVERVIEW ═══════════════ -->
+<div id="section-overview" class="section active">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Test Dashboard</h1>
+  <p style="color:var(--text-muted);margin-bottom:32px;">Black Sphere Industries — Integration test history &amp; release health.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px;" id="overview-stats">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-rate" style="color:var(--accent);">—</div>
+      <div class="stat-label">Latest Pass Rate</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--accent);" id="stat-runs">0</div>
+      <div class="stat-label">Total Test Runs</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--accent);" id="stat-version">—</div>
+      <div class="stat-label">Manifest Version</div>
+    </div>
+  </div>
+
+  <!-- Latest Run Summary -->
+  <div id="overview-latest" style="margin-bottom:32px;"></div>
+
+  <!-- Charts -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
+    <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Pass Rate Trend</div>
+      <canvas id="chart-passrate" height="200"></canvas>
+    </div>
+    <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Suite Health</div>
+      <canvas id="chart-suitehealth" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Recent Events -->
+  <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Recent Events</div>
+    <div id="overview-events" style="color:var(--text-muted);font-size:13px;">Loading events...</div>
+  </div>
+</div>
+
+<!-- ═══════════════ RUNS ═══════════════ -->
+<div id="section-runs" class="section">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Test Runs</h1>
+  <p style="color:var(--text-muted);margin-bottom:24px;">History of all integration test runs.</p>
+
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+    <input type="text" class="search-input" id="runs-search" placeholder="Search by version, date..." style="max-width:300px;" oninput="renderRunsTable()">
+    <button class="filter-btn active" onclick="filterRunsMode(this, 'all')">All</button>
+    <button class="filter-btn" onclick="filterRunsMode(this, 'demo')">Demo</button>
+    <button class="filter-btn" onclick="filterRunsMode(this, 'live')">Live</button>
+    <span style="flex:1;"></span>
+    <button class="filter-btn" id="compare-btn" onclick="compareSelected()" style="display:none;">Compare Selected</button>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table id="runs-table">
+      <thead>
+        <tr>
+          <th style="width:30px;"></th>
+          <th onclick="sortRuns('timestamp')">Date</th>
+          <th onclick="sortRuns('version')">Version</th>
+          <th onclick="sortRuns('mode')">Mode</th>
+          <th onclick="sortRuns('totalPass')">Pass</th>
+          <th onclick="sortRuns('totalFail')">Fail</th>
+          <th onclick="sortRuns('totalSkip')">Skip</th>
+          <th onclick="sortRuns('passRate')">Rate</th>
+          <th onclick="sortRuns('elapsed')">Duration</th>
+        </tr>
+      </thead>
+      <tbody id="runs-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ RUN DETAIL ═══════════════ -->
+<div id="section-detail" class="section">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+    <button class="filter-btn" onclick="showSection('runs', document.querySelector('#nav .nav-link:nth-child(2)'));">&larr; Back to Runs</button>
+    <h1 class="mono" style="font-size:28px;font-weight:800;">Run Detail</h1>
+  </div>
+  <div id="detail-content" style="margin-top:16px;">
+    <p style="color:var(--text-muted);">Select a run from the Runs table to view details.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ MANIFEST ═══════════════ -->
+<div id="section-manifest" class="section">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Manifest Explorer</h1>
+  <p style="color:var(--text-muted);margin-bottom:24px;">Release manifest — pinned repo commits and test coverage.</p>
+
+  <div id="manifest-content">
+    <p style="color:var(--text-muted);">No manifest data available. Submit a test run with an embedded manifest.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ COVERAGE MAP ═══════════════ -->
+<div id="section-coverage" class="section">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Coverage Map</h1>
+  <p style="color:var(--text-muted);margin-bottom:24px;">Test suite coverage across BSI apps.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+    <div class="stat-card">
+      <div class="stat-value rate-amber" id="cov-tested">16</div>
+      <div class="stat-label">Apps Tested</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value rate-red" id="cov-untested">18</div>
+      <div class="stat-label">Not Tested</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value rate-green" id="cov-percent">47%</div>
+      <div class="stat-label">Coverage</div>
+    </div>
+  </div>
+
+  <!-- Coverage Matrix -->
+  <div style="overflow-x:auto;margin-bottom:24px;">
+    <div id="coverage-matrix"></div>
+  </div>
+
+  <!-- Untested Repos -->
+  <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Untested Repos</div>
+    <div id="coverage-untested" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ TRENDS ═══════════════ -->
+<div id="section-trends" class="section">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Trends &amp; Analytics</h1>
+  <p style="color:var(--text-muted);margin-bottom:24px;">Test health trends, stability analysis, and flaky test detection.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+    <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Pass Rate Over Time</div>
+      <canvas id="chart-trend-rate" height="200"></canvas>
+    </div>
+    <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Duration Trend</div>
+      <canvas id="chart-trend-duration" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Failure Heatmap -->
+  <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;margin-bottom:24px;">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Failure Heatmap <span style="font-weight:400;color:var(--text-muted);font-size:12px;">(suites x recent runs)</span></div>
+    <div id="heatmap-container"></div>
+  </div>
+
+  <!-- Suite Stability -->
+  <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;margin-bottom:24px;">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Suite Stability</div>
+    <canvas id="chart-stability" height="250"></canvas>
+  </div>
+
+  <!-- Flaky Tests -->
+  <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Flaky Test Detection</div>
+    <div id="flaky-tests" style="color:var(--text-muted);font-size:13px;">Insufficient data. Submit multiple test runs to detect flaky tests.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ SETTINGS ═══════════════ -->
+<div id="section-settings" class="section">
+  <h1 class="mono" style="font-size:28px;font-weight:800;margin-bottom:8px;">Settings</h1>
+  <p style="color:var(--text-muted);margin-bottom:24px;">Import test results and manage dashboard data.</p>
+
+  <!-- Import -->
+  <details open>
+    <summary>Import Test Run</summary>
+    <div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Paste test run JSON from the integration runner's "Export for Dashboard" button.</p>
+      <textarea id="import-json" class="search-input" style="height:200px;resize:vertical;margin-bottom:12px;" placeholder='Paste test run JSON here...'></textarea>
+      <div style="display:flex;gap:8px;">
+        <button class="filter-btn" onclick="validateImport()">Validate</button>
+        <button class="filter-btn" onclick="submitImport()" id="import-submit" disabled>Submit to Dashboard</button>
+      </div>
+      <div id="import-status" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+  </details>
+
+  <!-- Dashboard Info -->
+  <details>
+    <summary>Dashboard Info</summary>
+    <div>
+      <div style="font-size:13px;color:var(--text-secondary);">
+        <p style="margin-bottom:8px;"><strong>API Endpoint:</strong> <code class="mono" style="font-size:12px;" id="api-url"></code></p>
+        <p style="margin-bottom:8px;"><strong>Total Runs:</strong> <span id="info-runs">0</span></p>
+        <p style="margin-bottom:8px;"><strong>Last Updated:</strong> <span id="info-updated">—</span></p>
+        <p style="margin-bottom:8px;"><strong>Webhook Events:</strong> <span id="info-events">0</span></p>
+      </div>
+    </div>
+  </details>
+
+  <!-- Webhook Setup -->
+  <details>
+    <summary>Webhook Setup</summary>
+    <div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Configure a GitHub webhook on the <code>bsi-devops</code> repo to track manifest changes.</p>
+      <div style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:8px;padding:16px;font-size:13px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);line-height:1.8;">
+        <div>Payload URL: <span style="color:var(--accent);" id="webhook-url"></span></div>
+        <div>Content type: <span style="color:var(--accent);">application/json</span></div>
+        <div>Secret: <span style="color:var(--accent);">(set in Cloudflare env as WEBHOOK_SECRET)</span></div>
+        <div>Events: <span style="color:var(--accent);">Just the push event</span></div>
+        <div>Active: <span style="color:var(--accent);">Yes</span></div>
+      </div>
+    </div>
+  </details>
+
+  <!-- Submission Workflows -->
+  <details>
+    <summary>Submission Workflows</summary>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
+      <p style="margin-bottom:12px;font-weight:600;">1. Direct POST (recommended)</p>
+      <p style="margin-bottom:12px;">Run integration tests &rarr; click "Export for Dashboard" &rarr; auto-POSTs to API.</p>
+
+      <p style="margin-bottom:12px;font-weight:600;">2. Shell Script</p>
+      <div style="background:var(--bg-body);border:1px solid var(--border-light);border-radius:8px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;margin-bottom:12px;color:var(--text-muted);">
+        ./scripts/submit-run.sh run.json --manifest ../bsi-devops/release-manifest.json
+      </div>
+
+      <p style="margin-bottom:12px;font-weight:600;">3. Manual Paste</p>
+      <p>Use the Import section above to paste and submit JSON directly.</p>
+    </div>
+  </details>
+</div>
+
+</div><!-- /main-content -->
+
+<!-- Compare Modal -->
+<div class="modal-overlay" id="compare-modal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 class="mono" style="font-size:18px;font-weight:700;">Run Comparison</h2>
+      <button onclick="closeCompare()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;">&times;</button>
+    </div>
+    <div id="compare-content"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Configuration ──────────────────────────────────────────────────
+  const API_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? '' : '';  // Same-origin for Cloudflare Pages Functions
+
+  // ── State ──────────────────────────────────────────────────────────
+  let runsIndex = { lastUpdated: null, runs: [] };
+  let runCache = {};
+  let events = [];
+  let manifests = { versions: [] };
+  let runsSortKey = 'timestamp';
+  let runsSortAsc = false;
+  let runsFilterMode = 'all';
+  let selectedRuns = new Set();
+  let charts = {};
+
+  // ── Suite-to-App Coverage Map (hardcoded from test source files) ──
+  const SUITE_COVERAGE = {
+    'Smoke \u2014 All Apps Load': ['portal','scrum-app','erp-app','req-management','alm-app','filter-design-studio-app','kinematics-studio-app','bambu-viewer','engineering-calcs-app','serial-app','jk-bms-app','forgeboard','notes-app','shop','label-designer-app','filaments-inventory'],
+    'SSO Chain \u2014 Admin Auth Flow': ['portal','scrum-app'],
+    'Projects Registry \u2014 Broadcast': ['scrum-app','erp-app','req-management'],
+    'Active Project \u2014 Scoping': ['scrum-app','erp-app'],
+    'Theme Propagation \u2014 Cross-App Theming': ['scrum-app','req-management','alm-app','erp-app'],
+    'Demo Seed Relay': ['scrum-app','erp-app'],
+    'Cross-App Links \u2014 Traceability CRUD': ['alm-app'],
+    'KDD Progression \u2014 V-Cycle': ['scrum-app'],
+    'Shop-ERP \u2014 Work Order Creation': ['erp-app','shop'],
+    'Filament Sync \u2014 Inventory': ['erp-app','filaments-inventory'],
+    'Label CRUD \u2014 Firestore': ['label-designer-app'],
+    'Regression \u2014 Known-Fixed Bugs': ['scrum-app','erp-app','req-management'],
+  };
+
+  const ALL_TEST_APPS = [...new Set(Object.values(SUITE_COVERAGE).flat())];
+  const MANIFEST_REPOS = [
+    'Notes_App','alm-app','bambu-viewer','bsi-devops','bsi-mcp-server','control-tuner-app',
+    'datasheet-search-app','engineering-calcs-app','erp-app','filaments-inventory',
+    'filter-design-studio-app','forgeboard','forgeboard-android','g-code-viewer','gear_calculator',
+    'home','jk-bms-app','kinematics-studio-app','label-designer-app','magfield-app','mech-fea-app',
+    'mijia_monitor','mindforge','pq-bms-app','py-lab-app','req-management','scrum-app','serial-app',
+    'shop','suspension-viz-app','vibration_mode_visualizer','woodcut-optimizer'
+  ];
+
+  // ── Data Loading ───────────────────────────────────────────────────
+  async function loadAll() {
+    try {
+      const [runsResp, eventsResp, manifestsResp] = await Promise.all([
+        fetch(API_BASE + '/api/runs').then(r => r.json()).catch(() => ({ lastUpdated: null, runs: [] })),
+        fetch(API_BASE + '/api/events').then(r => r.json()).catch(() => []),
+        fetch(API_BASE + '/api/manifests').then(r => r.json()).catch(() => ({ versions: [] })),
+      ]);
+      runsIndex = runsResp;
+      events = eventsResp;
+      manifests = manifestsResp;
+    } catch (e) {
+      console.error('Failed to load data:', e);
+    }
+    renderAll();
+  }
+
+  async function loadRun(id) {
+    if (runCache[id]) return runCache[id];
+    try {
+      const run = await fetch(API_BASE + '/api/run/' + encodeURIComponent(id)).then(r => r.json());
+      if (!run.error) runCache[id] = run;
+      return run;
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  // ── Render All ─────────────────────────────────────────────────────
+  function renderAll() {
+    renderOverview();
+    renderRunsTable();
+    renderCoverage();
+    renderManifest();
+    renderTrends();
+    renderSettings();
+    updateSidebarVersion();
+  }
+
+  // ── Overview ───────────────────────────────────────────────────────
+  function renderOverview() {
+    const runs = runsIndex.runs || [];
+
+    // Stats
+    if (runs.length > 0) {
+      const latest = runs[0];
+      const rateEl = document.getElementById('stat-rate');
+      rateEl.textContent = latest.passRate + '%';
+      rateEl.className = 'stat-value ' + rateClass(latest.passRate);
+      document.getElementById('stat-version').textContent = 'v' + latest.version;
+
+      // Latest run card
+      const latestEl = document.getElementById('overview-latest');
+      const isPass = latest.totalFail === 0;
+      latestEl.innerHTML = `
+        <div class="summary-bar ${isPass ? 'summary-pass' : 'summary-fail'}" style="margin-bottom:16px;">
+          ${latest.totalPass} passed, ${latest.totalFail} failed${latest.totalSkip ? ', ' + latest.totalSkip + ' skipped' : ''}
+          \u2014 ${formatDuration(latest.elapsed)}
+          \u2014 ${isPass ? 'All tests passed!' : latest.totalFail + ' test(s) need attention'}
+          <span style="float:right;font-weight:400;font-size:12px;">${formatDate(latest.timestamp)} &middot; ${latest.mode}</span>
+        </div>
+      `;
+    }
+    document.getElementById('stat-runs').textContent = runs.length;
+
+    // Pass Rate Chart
+    renderPassRateChart(runs.slice(0, 20).reverse());
+
+    // Suite Health Chart
+    renderSuiteHealthChart(runs.slice(0, 5));
+
+    // Events
+    renderEvents();
+  }
+
+  function renderPassRateChart(runs) {
+    const ctx = document.getElementById('chart-passrate');
+    if (!ctx) return;
+    if (charts.passrate) charts.passrate.destroy();
+    if (runs.length === 0) return;
+
+    charts.passrate = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: runs.map(r => formatDateShort(r.timestamp)),
+        datasets: [{
+          label: 'Pass Rate %',
+          data: runs.map(r => r.passRate),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointBackgroundColor: runs.map(r => r.passRate === 100 ? '#4ade80' : r.passRate >= 90 ? '#f59e0b' : '#f87171'),
+        }]
+      },
+      options: chartOptions({ min: 0, max: 100, suffix: '%' }),
+    });
+  }
+
+  function renderSuiteHealthChart(runs) {
+    const ctx = document.getElementById('chart-suitehealth');
+    if (!ctx) return;
+    if (charts.suitehealth) charts.suitehealth.destroy();
+    if (runs.length === 0) return;
+
+    // Aggregate suite pass rates across recent runs
+    const suiteNames = Object.keys(SUITE_COVERAGE);
+    const suiteRates = suiteNames.map(() => []);
+
+    // We need full run data for suite-level stats — use cached or estimate from index
+    // For now, show placeholder if no runs loaded
+    charts.suitehealth = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: suiteNames.map(s => s.split(' \u2014 ')[0].split(' — ')[0]),
+        datasets: [{
+          label: 'Expected Pass Rate',
+          data: suiteNames.map(() => 100),
+          backgroundColor: 'rgba(34,197,94,0.3)',
+          borderColor: '#22c55e',
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { min: 0, max: 100, grid: { color: 'rgba(63,63,70,0.3)' }, ticks: { color: '#71717a', callback: v => v + '%' } },
+          y: { grid: { display: false }, ticks: { color: '#a1a1aa', font: { size: 11, family: "'JetBrains Mono', monospace" } } },
+        },
+      },
+    });
+  }
+
+  function renderEvents() {
+    const el = document.getElementById('overview-events');
+    if (events.length === 0) {
+      el.innerHTML = '<span style="color:var(--text-muted);">No webhook events yet. Configure the GitHub webhook on bsi-devops to see events here.</span>';
+      return;
+    }
+    el.innerHTML = events.slice(0, 10).map(e => `
+      <div class="event-item">
+        <span class="badge ${e.manifestChanged ? 'badge-amber' : 'badge-zinc'}">${e.type}</span>
+        <code class="mono" style="font-size:12px;margin-left:8px;">${e.commitHash}</code>
+        <span style="margin-left:8px;">${escapeHtml(e.commitMessage || '')}</span>
+        <span style="float:right;color:var(--text-muted);font-size:11px;">${formatDate(e.timestamp)}</span>
+        ${e.version ? '<span class="badge badge-green" style="margin-left:8px;">v' + e.version + '</span>' : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── Runs Table ─────────────────────────────────────────────────────
+  window.renderRunsTable = function () {
+    const search = (document.getElementById('runs-search')?.value || '').toLowerCase();
+    let runs = (runsIndex.runs || []).filter(r => {
+      if (runsFilterMode !== 'all' && r.mode !== runsFilterMode) return false;
+      if (search) {
+        const hay = (r.version + ' ' + r.timestamp + ' ' + r.mode + ' ' + r.id).toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+
+    runs.sort((a, b) => {
+      const va = a[runsSortKey] ?? '';
+      const vb = b[runsSortKey] ?? '';
+      if (typeof va === 'number') return runsSortAsc ? va - vb : vb - va;
+      return runsSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+
+    const tbody = document.getElementById('runs-body');
+    if (!tbody) return;
+    tbody.innerHTML = runs.map(r => `
+      <tr class="clickable-row" onclick="viewRun('${escapeAttr(r.id)}')">
+        <td onclick="event.stopPropagation()"><input type="checkbox" ${selectedRuns.has(r.id) ? 'checked' : ''} onchange="toggleRunSelect('${escapeAttr(r.id)}', this.checked)"></td>
+        <td class="mono" style="font-size:12px;">${formatDate(r.timestamp)}</td>
+        <td><span class="badge badge-blue">v${r.version}</span></td>
+        <td><span class="badge ${r.mode === 'live' ? 'badge-green' : 'badge-zinc'}">${r.mode}</span></td>
+        <td style="color:#4ade80;">${r.totalPass}</td>
+        <td style="color:${r.totalFail > 0 ? '#f87171' : '#4ade80'};">${r.totalFail}</td>
+        <td style="color:var(--text-muted);">${r.totalSkip || 0}</td>
+        <td class="${rateClass(r.passRate)} mono" style="font-weight:600;">${r.passRate}%</td>
+        <td style="color:var(--text-muted);">${formatDuration(r.elapsed)}</td>
+      </tr>
+    `).join('');
+
+    // Compare button
+    document.getElementById('compare-btn').style.display = selectedRuns.size === 2 ? 'inline-block' : 'none';
+  };
+
+  window.sortRuns = function (key) {
+    if (runsSortKey === key) runsSortAsc = !runsSortAsc;
+    else { runsSortKey = key; runsSortAsc = key === 'timestamp' ? false : true; }
+    renderRunsTable();
+  };
+
+  window.filterRunsMode = function (btn, mode) {
+    runsFilterMode = mode;
+    document.querySelectorAll('#section-runs .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderRunsTable();
+  };
+
+  window.toggleRunSelect = function (id, checked) {
+    if (checked) selectedRuns.add(id); else selectedRuns.delete(id);
+    if (selectedRuns.size > 2) {
+      const first = selectedRuns.values().next().value;
+      selectedRuns.delete(first);
+    }
+    renderRunsTable();
+  };
+
+  // ── Run Detail ─────────────────────────────────────────────────────
+  window.viewRun = async function (id) {
+    document.getElementById('nav-detail').style.display = 'flex';
+    showSection('detail', document.getElementById('nav-detail'));
+
+    const el = document.getElementById('detail-content');
+    el.innerHTML = '<p style="color:var(--text-muted);">Loading run...</p>';
+
+    const run = await loadRun(id);
+    if (run.error) {
+      el.innerHTML = '<p style="color:#f87171;">Error: ' + escapeHtml(run.error) + '</p>';
+      return;
+    }
+
+    const isPass = run.totalFail === 0;
+    let html = `
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <span class="badge badge-blue">v${run.manifestVersion || 'unknown'}</span>
+        <span class="badge ${run.mode === 'live' ? 'badge-green' : 'badge-zinc'}">${run.mode || 'unknown'}</span>
+        <span style="color:var(--text-muted);font-size:12px;" class="mono">${formatDate(run.timestamp)}</span>
+        <span style="color:var(--text-muted);font-size:12px;" class="mono">${formatDuration(run.elapsed)}</span>
+      </div>
+      <div class="summary-bar ${isPass ? 'summary-pass' : 'summary-fail'}" style="margin-bottom:24px;">
+        ${run.totalPass} passed, ${run.totalFail} failed${run.totalSkip ? ', ' + run.totalSkip + ' skipped' : ''}
+        \u2014 ${formatDuration(run.elapsed)} \u2014
+        ${isPass ? 'All tests passed!' : run.totalFail + ' test(s) need attention'}
+      </div>
+    `;
+
+    // Suites
+    if (run.suites) {
+      for (const suite of run.suites) {
+        const sp = suite.pass || suite.tests.filter(t => t.status === 'pass').length;
+        const sf = suite.fail || suite.tests.filter(t => t.status === 'fail').length;
+        const ss = suite.skip || suite.tests.filter(t => t.status === 'skip').length;
+        html += `
+          <details ${sf > 0 ? 'open' : ''}>
+            <summary>
+              ${escapeHtml(suite.name)}
+              <span class="badge ${sf > 0 ? 'badge-red' : 'badge-green'}" style="margin-left:auto;">${sp}/${suite.tests.length}</span>
+            </summary>
+            <div>
+        `;
+        for (const test of suite.tests) {
+          const cls = test.status === 'pass' ? 'test-pass' : test.status === 'fail' ? 'test-fail' : 'test-skip';
+          const icon = test.status === 'pass' ? '\u2713' : test.status === 'fail' ? '\u2717' : '\u2014';
+          html += `
+            <div class="test-row ${cls}">
+              <span class="test-icon">${icon}</span>
+              ${escapeHtml(test.name)}
+              <span class="test-timing">${test.elapsed}ms</span>
+              ${test.error ? '<div class="test-error">' + escapeHtml(test.error) + '</div>' : ''}
+            </div>
+          `;
+        }
+        html += '</div></details>';
+      }
+    }
+
+    // Manifest
+    if (run.manifest && run.manifest.repos) {
+      html += `
+        <details style="margin-top:16px;">
+          <summary>Manifest at this run (v${run.manifestVersion || '?'})</summary>
+          <div>
+            <table>
+              <thead><tr><th>Repo</th><th>Commit</th><th>GitHub</th></tr></thead>
+              <tbody>
+      `;
+      for (const [name, info] of Object.entries(run.manifest.repos).sort((a, b) => a[0].localeCompare(b[0]))) {
+        const ghUrl = 'https://github.com/' + info.repo + '/commit/' + info.commit;
+        html += `
+          <tr>
+            <td class="mono" style="font-size:12px;">${name}</td>
+            <td class="mono" style="font-size:12px;">${info.commit}</td>
+            <td><a href="${ghUrl}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:12px;">View &rarr;</a></td>
+          </tr>
+        `;
+      }
+      html += '</tbody></table></div></details>';
+    }
+
+    // Coverage
+    if (run.coverage) {
+      html += `
+        <details style="margin-top:16px;">
+          <summary>Coverage Summary</summary>
+          <div style="font-size:13px;color:var(--text-secondary);">
+            <p>Repos in manifest: ${run.coverage.reposInManifest}</p>
+            <p>Repos tested: ${run.coverage.reposTested} (${run.coverage.coveragePercent}%)</p>
+            ${run.coverage.appsNotTested?.length ? '<p style="margin-top:8px;">Untested: ' + run.coverage.appsNotTested.map(a => '<span class="badge badge-red">' + a + '</span>').join(' ') + '</p>' : ''}
+          </div>
+        </details>
+      `;
+    }
+
+    el.innerHTML = html;
+  };
+
+  // ── Compare ────────────────────────────────────────────────────────
+  window.compareSelected = async function () {
+    const ids = [...selectedRuns];
+    if (ids.length !== 2) return;
+
+    const [run1, run2] = await Promise.all(ids.map(id => loadRun(id)));
+    if (run1.error || run2.error) return;
+
+    // Order by timestamp (older first)
+    const [older, newer] = run1.timestamp < run2.timestamp ? [run1, run2] : [run2, run1];
+
+    let html = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div class="stat-card">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Older Run</div>
+          <div class="mono" style="font-size:13px;">${formatDate(older.timestamp)}</div>
+          <div class="${rateClass(older.passRate)} mono" style="font-weight:600;">${older.passRate}%</div>
+        </div>
+        <div class="stat-card">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Newer Run</div>
+          <div class="mono" style="font-size:13px;">${formatDate(newer.timestamp)}</div>
+          <div class="${rateClass(newer.passRate)} mono" style="font-weight:600;">${newer.passRate}%</div>
+        </div>
+      </div>
+    `;
+
+    // Test status changes
+    const olderTests = flattenTests(older);
+    const newerTests = flattenTests(newer);
+    const changes = [];
+    for (const [key, newStatus] of Object.entries(newerTests)) {
+      const oldStatus = olderTests[key];
+      if (oldStatus && oldStatus !== newStatus) {
+        changes.push({ name: key, from: oldStatus, to: newStatus });
+      }
+    }
+
+    if (changes.length > 0) {
+      html += '<div style="font-weight:600;margin-bottom:8px;">Test Status Changes</div>';
+      html += changes.map(c => `
+        <div style="font-size:13px;padding:4px 0;">
+          <span class="badge ${c.from === 'pass' ? 'badge-green' : 'badge-red'}">${c.from}</span>
+          &rarr;
+          <span class="badge ${c.to === 'pass' ? 'badge-green' : 'badge-red'}">${c.to}</span>
+          <span style="margin-left:8px;">${escapeHtml(c.name)}</span>
+        </div>
+      `).join('');
+    } else {
+      html += '<p style="color:var(--text-muted);font-size:13px;">No test status changes between these runs.</p>';
+    }
+
+    // Manifest diff
+    if (older.manifest?.repos && newer.manifest?.repos) {
+      const diffs = [];
+      for (const [repo, newInfo] of Object.entries(newer.manifest.repos)) {
+        const oldInfo = older.manifest.repos[repo];
+        if (!oldInfo) diffs.push({ repo, type: 'added', newCommit: newInfo.commit, ghRepo: newInfo.repo });
+        else if (oldInfo.commit !== newInfo.commit) diffs.push({ repo, type: 'changed', oldCommit: oldInfo.commit, newCommit: newInfo.commit, ghRepo: newInfo.repo });
+      }
+      for (const [repo] of Object.entries(older.manifest.repos)) {
+        if (!newer.manifest.repos[repo]) diffs.push({ repo, type: 'removed' });
+      }
+
+      if (diffs.length > 0) {
+        html += '<div style="font-weight:600;margin-top:16px;margin-bottom:8px;">Manifest Changes</div>';
+        html += diffs.map(d => {
+          if (d.type === 'changed') {
+            const url = `https://github.com/${d.ghRepo}/compare/${d.oldCommit}...${d.newCommit}`;
+            return `<div style="font-size:13px;padding:4px 0;">
+              <span class="badge badge-amber">changed</span>
+              <code class="mono" style="font-size:12px;margin-left:8px;">${d.repo}</code>
+              <code class="mono" style="font-size:11px;color:var(--text-muted);margin-left:8px;">${d.oldCommit} &rarr; ${d.newCommit}</code>
+              <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;margin-left:8px;">diff &rarr;</a>
+            </div>`;
+          }
+          return `<div style="font-size:13px;padding:4px 0;">
+            <span class="badge badge-${d.type === 'added' ? 'green' : 'red'}">${d.type}</span>
+            <code class="mono" style="font-size:12px;margin-left:8px;">${d.repo}</code>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    document.getElementById('compare-content').innerHTML = html;
+    document.getElementById('compare-modal').classList.add('active');
+  };
+
+  window.closeCompare = function () {
+    document.getElementById('compare-modal').classList.remove('active');
+  };
+
+  // ── Manifest ───────────────────────────────────────────────────────
+  function renderManifest() {
+    const el = document.getElementById('manifest-content');
+    const runs = runsIndex.runs || [];
+
+    // Find latest run with manifest data
+    const latestWithManifest = runs.find(r => runCache[r.id]?.manifest?.repos);
+    if (!latestWithManifest && runs.length > 0) {
+      // Try loading the latest run to get manifest
+      loadRun(runs[0].id).then(run => {
+        if (run.manifest?.repos) renderManifestTable(run);
+      });
+      el.innerHTML = '<p style="color:var(--text-muted);">Loading manifest from latest run...</p>';
+      return;
+    }
+
+    if (latestWithManifest) {
+      renderManifestTable(runCache[latestWithManifest.id]);
+    }
+  }
+
+  function renderManifestTable(run) {
+    const el = document.getElementById('manifest-content');
+    if (!run?.manifest?.repos) return;
+
+    const repos = Object.entries(run.manifest.repos).sort((a, b) => a[0].localeCompare(b[0]));
+
+    let html = `
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+        <span class="badge badge-amber">v${run.manifest.version || run.manifestVersion || '?'}</span>
+        <span style="color:var(--text-muted);font-size:12px;" class="mono">${run.manifest.date || run.manifestDate || ''}</span>
+        <span style="color:var(--text-muted);font-size:12px;">${repos.length} repos</span>
+      </div>
+      <div style="margin-bottom:16px;">
+        <input type="text" class="search-input" placeholder="Search repos..." style="max-width:300px;" oninput="filterManifestTable(this.value)">
+      </div>
+      <table id="manifest-table">
+        <thead><tr><th>Repo</th><th>Commit</th><th>Coverage</th><th>GitHub</th></tr></thead>
+        <tbody>
+    `;
+
+    for (const [name, info] of repos) {
+      const coverage = getRepoCoverage(name);
+      const ghUrl = 'https://github.com/' + info.repo + '/commit/' + info.commit;
+      html += `
+        <tr data-repo="${name.toLowerCase()}">
+          <td class="mono" style="font-size:12px;">${name}</td>
+          <td class="mono" style="font-size:12px;">${info.commit}</td>
+          <td><span class="badge ${coverage === 'Integration' ? 'badge-green' : coverage === 'Smoke' ? 'badge-amber' : 'badge-red'}">${coverage}</span></td>
+          <td><a href="${ghUrl}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:12px;">View &rarr;</a></td>
+        </tr>
+      `;
+    }
+    html += '</tbody></table>';
+
+    // Manifest version history
+    if (manifests.versions.length > 0) {
+      html += `
+        <div style="margin-top:24px;">
+          <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">Manifest History</h3>
+          <table>
+            <thead><tr><th>Version</th><th>Date</th><th>Repos</th></tr></thead>
+            <tbody>
+      `;
+      for (const v of manifests.versions) {
+        html += `<tr><td class="mono" style="font-size:12px;">v${v.version}</td><td>${v.date || '\u2014'}</td><td>${v.repoCount}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+    }
+
+    el.innerHTML = html;
+  }
+
+  window.filterManifestTable = function (search) {
+    const rows = document.querySelectorAll('#manifest-table tbody tr');
+    const term = search.toLowerCase();
+    rows.forEach(row => {
+      row.style.display = row.dataset.repo.includes(term) ? '' : 'none';
+    });
+  };
+
+  function getRepoCoverage(repoName) {
+    // Check if this repo is directly tested (in named suites beyond smoke)
+    const namedSuites = Object.entries(SUITE_COVERAGE).filter(([name]) => !name.startsWith('Smoke'));
+    for (const [, apps] of namedSuites) {
+      if (apps.includes(repoName) || apps.includes(repoName.replace(/_/g, '-'))) return 'Integration';
+    }
+    // Check smoke
+    const smokeApps = SUITE_COVERAGE['Smoke \u2014 All Apps Load'] || [];
+    if (smokeApps.includes(repoName) || smokeApps.includes(repoName.replace(/_/g, '-'))) return 'Smoke';
+    return 'None';
+  }
+
+  // ── Coverage Map ───────────────────────────────────────────────────
+  function renderCoverage() {
+    const suites = Object.keys(SUITE_COVERAGE);
+    const apps = ALL_TEST_APPS.sort();
+
+    // Stats
+    const testedCount = apps.length;
+    const untestedRepos = MANIFEST_REPOS.filter(r => !apps.includes(r) && !apps.includes(r.replace(/_/g, '-')));
+    const total = MANIFEST_REPOS.length;
+    document.getElementById('cov-tested').textContent = testedCount;
+    document.getElementById('cov-untested').textContent = untestedRepos.length;
+    document.getElementById('cov-percent').textContent = Math.round((testedCount / total) * 100) + '%';
+
+    // Matrix
+    const matrix = document.getElementById('coverage-matrix');
+    let html = '<table style="font-size:11px;"><thead><tr><th style="text-align:left;">Suite</th>';
+    for (const app of apps) {
+      html += `<th style="writing-mode:vertical-lr;transform:rotate(180deg);padding:4px 2px;font-size:10px;max-width:24px;">${app.split('-')[0]}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+
+    for (const suite of suites) {
+      const sApps = SUITE_COVERAGE[suite];
+      const shortName = suite.split(' \u2014 ')[0].split(' — ')[0];
+      html += `<tr><td style="font-size:11px;white-space:nowrap;padding-right:8px;">${shortName}</td>`;
+      for (const app of apps) {
+        const covered = sApps.includes(app);
+        html += `<td style="padding:2px;"><div class="coverage-cell ${covered ? 'coverage-yes' : 'coverage-no'}">${covered ? '\u2713' : ''}</div></td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    matrix.innerHTML = html;
+
+    // Untested repos
+    const untestedEl = document.getElementById('coverage-untested');
+    if (untestedRepos.length > 0) {
+      untestedEl.innerHTML = untestedRepos.map(r => `<span class="badge badge-red">${r}</span>`).join('');
+    } else {
+      untestedEl.innerHTML = '<span style="color:var(--text-muted);">All repos have coverage!</span>';
+    }
+  }
+
+  // ── Trends ─────────────────────────────────────────────────────────
+  function renderTrends() {
+    const runs = (runsIndex.runs || []).slice(0, 30).reverse();
+    if (runs.length < 2) {
+      document.getElementById('heatmap-container').innerHTML = '<span style="color:var(--text-muted);font-size:13px;">Need at least 2 runs for trend data.</span>';
+      return;
+    }
+
+    // Pass rate trend (by mode)
+    renderTrendRateChart(runs);
+    // Duration trend
+    renderTrendDurationChart(runs);
+    // Heatmap placeholder
+    renderHeatmap(runs);
+    // Stability placeholder
+    renderStabilityChart(runs);
+    // Flaky test detection
+    detectFlakyTests(runs);
+  }
+
+  function renderTrendRateChart(runs) {
+    const ctx = document.getElementById('chart-trend-rate');
+    if (!ctx) return;
+    if (charts.trendRate) charts.trendRate.destroy();
+
+    const demoRuns = runs.filter(r => r.mode === 'demo');
+    const liveRuns = runs.filter(r => r.mode === 'live');
+
+    const datasets = [];
+    if (demoRuns.length > 0) {
+      datasets.push({
+        label: 'Demo', data: demoRuns.map(r => ({ x: r.timestamp, y: r.passRate })),
+        borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, tension: 0.3, pointRadius: 3,
+      });
+    }
+    if (liveRuns.length > 0) {
+      datasets.push({
+        label: 'Live', data: liveRuns.map(r => ({ x: r.timestamp, y: r.passRate })),
+        borderColor: '#4ade80', backgroundColor: 'rgba(34,197,94,0.1)', fill: false, tension: 0.3, borderDash: [5, 3], pointRadius: 3,
+      });
+    }
+
+    charts.trendRate = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#a1a1aa', font: { family: "'JetBrains Mono', monospace", size: 11 } } } },
+        scales: {
+          x: { type: 'category', labels: runs.map(r => formatDateShort(r.timestamp)), grid: { color: 'rgba(63,63,70,0.3)' }, ticks: { color: '#71717a', font: { size: 10 } } },
+          y: { min: 0, max: 100, grid: { color: 'rgba(63,63,70,0.3)' }, ticks: { color: '#71717a', callback: v => v + '%' } },
+        },
+      },
+    });
+  }
+
+  function renderTrendDurationChart(runs) {
+    const ctx = document.getElementById('chart-trend-duration');
+    if (!ctx) return;
+    if (charts.trendDuration) charts.trendDuration.destroy();
+
+    charts.trendDuration = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: runs.map(r => formatDateShort(r.timestamp)),
+        datasets: [{
+          label: 'Duration (s)',
+          data: runs.map(r => Math.round(r.elapsed / 1000)),
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.1)',
+          fill: true, tension: 0.3, pointRadius: 3,
+        }]
+      },
+      options: chartOptions({ suffix: 's' }),
+    });
+  }
+
+  function renderHeatmap(runs) {
+    const el = document.getElementById('heatmap-container');
+    // We need full run data for heatmaps — show what we can from index
+    const recentRuns = runs.slice(-10);
+    const suiteNames = Object.keys(SUITE_COVERAGE);
+
+    let html = '<div style="display:flex;gap:4px;margin-bottom:8px;padding-left:140px;">';
+    html += recentRuns.map(r => `<div style="width:24px;text-align:center;font-size:9px;color:var(--text-muted);writing-mode:vertical-lr;transform:rotate(180deg);">${formatDateShort(r.timestamp)}</div>`).join('');
+    html += '</div>';
+
+    // Without full data, show a placeholder grid
+    html += '<div style="font-size:13px;color:var(--text-muted);margin-top:8px;">Heatmap requires full run data. Click individual runs to load suite details, then revisit this page.</div>';
+
+    el.innerHTML = html;
+  }
+
+  function renderStabilityChart(runs) {
+    const ctx = document.getElementById('chart-stability');
+    if (!ctx) return;
+    if (charts.stability) charts.stability.destroy();
+
+    // Placeholder — will be populated when full run data is cached
+    charts.stability = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(SUITE_COVERAGE).map(s => s.split(' \u2014 ')[0].split(' — ')[0]),
+        datasets: [{
+          label: 'Runs Tracked',
+          data: Object.keys(SUITE_COVERAGE).map(() => runs.length),
+          backgroundColor: 'rgba(245,158,11,0.2)',
+          borderColor: '#f59e0b',
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(63,63,70,0.3)' }, ticks: { color: '#71717a' } },
+          y: { grid: { display: false }, ticks: { color: '#a1a1aa', font: { size: 10, family: "'JetBrains Mono', monospace" } } },
+        },
+      },
+    });
+  }
+
+  function detectFlakyTests(runs) {
+    const el = document.getElementById('flaky-tests');
+    if (runs.length < 3) {
+      el.innerHTML = '<span style="color:var(--text-muted);">Need at least 3 runs to detect flaky tests.</span>';
+      return;
+    }
+    // Will be populated when full run data is available
+    el.innerHTML = '<span style="color:var(--text-muted);">Load individual run details to enable flaky test analysis. Flaky tests are those that alternate between pass and fail across consecutive runs.</span>';
+  }
+
+  // ── Settings ───────────────────────────────────────────────────────
+  function renderSettings() {
+    const base = location.origin;
+    document.getElementById('api-url').textContent = base + '/api/runs';
+    document.getElementById('webhook-url').textContent = base + '/api/webhook';
+    document.getElementById('info-runs').textContent = (runsIndex.runs || []).length;
+    document.getElementById('info-updated').textContent = runsIndex.lastUpdated ? formatDate(runsIndex.lastUpdated) : '\u2014';
+    document.getElementById('info-events').textContent = events.length;
+  }
+
+  window.validateImport = function () {
+    const textarea = document.getElementById('import-json');
+    const status = document.getElementById('import-status');
+    const submitBtn = document.getElementById('import-submit');
+
+    try {
+      const data = JSON.parse(textarea.value);
+      const required = ['totalPass', 'totalFail', 'suites'];
+      const missing = required.filter(f => data[f] === undefined);
+
+      if (missing.length > 0) {
+        status.innerHTML = '<span style="color:#f87171;">Missing fields: ' + missing.join(', ') + '</span>';
+        submitBtn.disabled = true;
+        return;
+      }
+
+      const total = data.totalPass + data.totalFail + (data.totalSkip || 0);
+      const rate = total > 0 ? Math.round((data.totalPass / total) * 1000) / 10 : 0;
+      status.innerHTML = `
+        <span style="color:#4ade80;">Valid JSON</span> &mdash;
+        ${data.totalPass} pass, ${data.totalFail} fail, ${total} total (${rate}%) &mdash;
+        ${data.suites?.length || 0} suites &mdash;
+        ${data.manifestVersion ? 'v' + data.manifestVersion : 'no manifest'}
+      `;
+      submitBtn.disabled = false;
+    } catch (e) {
+      status.innerHTML = '<span style="color:#f87171;">Invalid JSON: ' + escapeHtml(e.message) + '</span>';
+      submitBtn.disabled = true;
+    }
+  };
+
+  window.submitImport = async function () {
+    const textarea = document.getElementById('import-json');
+    const status = document.getElementById('import-status');
+    const submitBtn = document.getElementById('import-submit');
+
+    submitBtn.disabled = true;
+    status.innerHTML = '<span style="color:var(--accent);">Submitting...</span>';
+
+    try {
+      const data = JSON.parse(textarea.value);
+      if (!data.timestamp) data.timestamp = new Date().toISOString();
+      if (!data.totalTests) data.totalTests = data.totalPass + data.totalFail + (data.totalSkip || 0);
+
+      const resp = await fetch(API_BASE + '/api/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await resp.json();
+      if (resp.ok) {
+        status.innerHTML = '<span style="color:#4ade80;">Submitted successfully! ID: ' + result.id + '</span>';
+        textarea.value = '';
+        // Reload data
+        await loadAll();
+      } else {
+        status.innerHTML = '<span style="color:#f87171;">Error: ' + (result.error || 'Unknown error') + '</span>';
+      }
+    } catch (e) {
+      status.innerHTML = '<span style="color:#f87171;">Error: ' + escapeHtml(e.message) + '</span>';
+    }
+    submitBtn.disabled = false;
+  };
+
+  // ── Navigation ─────────────────────────────────────────────────────
+  window.showSection = function (id, navEl) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    const section = document.getElementById('section-' + id);
+    if (section) section.classList.add('active');
+    document.querySelectorAll('#nav .nav-link').forEach(l => l.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+
+    // Lazy-load manifest data when entering manifest section
+    if (id === 'manifest') renderManifest();
+  };
+
+  window.toggleTheme = function () {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = next === 'light' ? '#ffffff' : '#09090b';
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────
+  function formatDate(ts) {
+    if (!ts) return '\u2014';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+      d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDateShort(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  }
+
+  function formatDuration(ms) {
+    if (!ms) return '\u2014';
+    if (ms < 1000) return ms + 'ms';
+    const s = Math.round(ms / 1000);
+    if (s < 60) return s + 's';
+    return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  }
+
+  function rateClass(rate) {
+    if (rate === 100) return 'rate-green';
+    if (rate >= 90) return 'rate-amber';
+    return 'rate-red';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(str) {
+    return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  }
+
+  function flattenTests(run) {
+    const map = {};
+    if (!run.suites) return map;
+    for (const suite of run.suites) {
+      for (const test of suite.tests) {
+        map[suite.name + ' > ' + test.name] = test.status;
+      }
+    }
+    return map;
+  }
+
+  function chartOptions(opts) {
+    return {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(63,63,70,0.3)' }, ticks: { color: '#71717a', font: { size: 10, family: "'JetBrains Mono', monospace" } } },
+        y: { min: opts.min, max: opts.max, grid: { color: 'rgba(63,63,70,0.3)' },
+          ticks: { color: '#71717a', callback: v => v + (opts.suffix || '') } },
+      },
+    };
+  }
+
+  function updateSidebarVersion() {
+    const el = document.getElementById('sidebar-version');
+    const runs = runsIndex.runs || [];
+    if (runs.length > 0) {
+      const latest = runs[0];
+      const color = latest.totalFail === 0 ? '#4ade80' : '#f87171';
+      el.innerHTML = `<span style="color:${color};">v${latest.version}</span> \u00B7 ${formatDateShort(latest.timestamp)}`;
+    } else {
+      el.textContent = 'no data';
+    }
+  }
+
+  // ── Hash routing ───────────────────────────────────────────────────
+  function handleHash() {
+    const hash = location.hash.substring(1);
+    if (hash.startsWith('run/')) {
+      const id = decodeURIComponent(hash.substring(4));
+      viewRun(id);
+    }
+  }
+  window.addEventListener('hashchange', handleHash);
+
+  // ── Init ───────────────────────────────────────────────────────────
+  loadAll();
+  lucide.createIcons();
+  if (location.hash) setTimeout(handleHash, 500);
+})();
+</script>
+</body>
+</html>

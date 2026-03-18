@@ -1,0 +1,7 @@
+name = "bsi-test-dashboard"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "."
+
+[[kv_namespaces]]
+binding = "BSI_DASHBOARD"
+id = ""  # Fill in after creating the KV namespace via: wrangler kv namespace create BSI_DASHBOARD
