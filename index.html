@@ -429,7 +429,7 @@
 
   // ── Suite-to-App Coverage Map (hardcoded from test source files) ──
   const SUITE_COVERAGE = {
-    'Smoke \u2014 All Apps Load': ['portal','scrum-app','erp-app','req-management','alm-app','filter-design-studio-app','kinematics-studio-app','bambu-viewer','engineering-calcs-app','serial-app','jk-bms-app','forgeboard','notes-app','shop','label-designer-app','filaments-inventory'],
+    'Smoke \u2014 All Apps Load': ['portal','scrum-app','erp-app','req-management','alm-app','filter-design-studio-app','kinematics-studio-app','bambu-viewer','engineering-calcs-app','serial-app','jk-bms-app','forgeboard','notes-app','shop','label-designer-app','filaments-inventory','control-tuner-app','datasheet-search-app','g-code-viewer','gear_calculator','magfield-app','mech-fea-app','mindforge','py-lab-app','suspension-viz-app','vibration_mode_visualizer','woodcut-optimizer','pq-bms-app'],
     'SSO Chain \u2014 Admin Auth Flow': ['portal','scrum-app'],
     'Projects Registry \u2014 Broadcast': ['scrum-app','erp-app','req-management'],
     'Active Project \u2014 Scoping': ['scrum-app','erp-app'],
@@ -441,6 +441,11 @@
     'Filament Sync \u2014 Inventory': ['erp-app','filaments-inventory'],
     'Label CRUD \u2014 Firestore': ['label-designer-app'],
     'Regression \u2014 Known-Fixed Bugs': ['scrum-app','erp-app','req-management'],
+    'Engineering Viz \u2014 3D Tools': ['control-tuner-app','magfield-app','mech-fea-app','suspension-viz-app','vibration_mode_visualizer'],
+    'Fabrication Tools \u2014 Design': ['gear_calculator','g-code-viewer','woodcut-optimizer'],
+    'Data Apps \u2014 Firebase & Search': ['mindforge','py-lab-app','datasheet-search-app'],
+    'Hardware Apps \u2014 Degradation': ['pq-bms-app','serial-app','jk-bms-app'],
+    'Portal \u2014 Deep Integration': ['portal','scrum-app','erp-app','req-management','alm-app','engineering-calcs-app','filter-design-studio-app','bambu-viewer','shop','forgeboard','label-designer-app'],
   };
 
   const ALL_TEST_APPS = [...new Set(Object.values(SUITE_COVERAGE).flat())];
