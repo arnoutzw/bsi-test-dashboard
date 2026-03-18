@@ -433,25 +433,47 @@ window._testTarget = 'remote';
     document.getElementById('export-bar').style.display = 'flex';
   }, 100);
 
-  // Fetch manifest from GitHub API (public, no auth needed)
+  // Fetch manifest — try dashboard API first (has stored manifests from prior runs),
+  // then fall back to GitHub API (only works for public repos)
   let _manifestCache = null;
   async function fetchManifest() {
     if (_manifestCache) return _manifestCache;
+
+    // 1. Try dashboard API — manifests stored in KV from previous test runs
+    try {
+      const mResp = await fetch(DASHBOARD_URL + '/api/manifests');
+      if (mResp.ok) {
+        const mIndex = await mResp.json();
+        if (mIndex.versions && mIndex.versions.length > 0) {
+          const latest = mIndex.versions[0];
+          const vResp = await fetch(DASHBOARD_URL + '/api/manifests?version=' + latest.version);
+          if (vResp.ok) {
+            _manifestCache = await vResp.json();
+            console.log('[runner] Manifest fetched from dashboard API: v' + _manifestCache.version);
+            return _manifestCache;
+          }
+        }
+      }
+    } catch (e) { console.warn('[runner] Dashboard API manifest fetch failed:', e.message); }
+
+    // 2. Fall back to GitHub API (works for public repos only)
     try {
       const resp = await fetch('https://api.github.com/repos/arnoutzw/bsi-devops/contents/release-manifest.json', {
         headers: { 'Accept': 'application/vnd.github.v3.raw', 'User-Agent': 'BSI-Test-Dashboard' }
       });
       if (resp.ok) {
         _manifestCache = await resp.json();
+        console.log('[runner] Manifest fetched from GitHub API: v' + _manifestCache.version);
         return _manifestCache;
       }
-    } catch (e) { console.warn('[runner] Could not fetch manifest from GitHub:', e.message); }
+    } catch (e) { console.warn('[runner] GitHub API manifest fetch failed:', e.message); }
+
     return null;
   }
 
   async function buildPayload() {
     const status = document.getElementById('export-status');
-    status.textContent = 'Fetching manifest from GitHub...';
+    status.textContent = 'Fetching manifest...';
     const manifest = await fetchManifest();
     const r = window._testResults;
     const totalTests = r.totalPass + r.totalFail + r.totalSkip;
