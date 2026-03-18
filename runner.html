@@ -433,9 +433,26 @@ window._testTarget = 'remote';
     document.getElementById('export-bar').style.display = 'flex';
   }, 100);
 
-  window.postToDashboard = async function () {
+  // Fetch manifest from GitHub API (public, no auth needed)
+  let _manifestCache = null;
+  async function fetchManifest() {
+    if (_manifestCache) return _manifestCache;
+    try {
+      const resp = await fetch('https://api.github.com/repos/arnoutzw/bsi-devops/contents/release-manifest.json', {
+        headers: { 'Accept': 'application/vnd.github.v3.raw', 'User-Agent': 'BSI-Test-Dashboard' }
+      });
+      if (resp.ok) {
+        _manifestCache = await resp.json();
+        return _manifestCache;
+      }
+    } catch (e) { console.warn('[runner] Could not fetch manifest from GitHub:', e.message); }
+    return null;
+  }
+
+  async function buildPayload() {
     const status = document.getElementById('export-status');
-    status.textContent = 'Submitting...';
+    status.textContent = 'Fetching manifest from GitHub...';
+    const manifest = await fetchManifest();
     const r = window._testResults;
     const totalTests = r.totalPass + r.totalFail + r.totalSkip;
     const payload = {
@@ -451,9 +468,18 @@ window._testTarget = 'remote';
           skip: s.tests.filter(function (t) { return t.status === 'skip'; }).length,
           tests: s.tests };
       }),
-      manifestVersion: 'unknown', manifestDate: 'unknown', manifest: null,
+      manifest: manifest,
+      manifestVersion: manifest ? manifest.version : 'unknown',
+      manifestDate: manifest ? manifest.date : 'unknown',
     };
     payload.id = payload.timestamp.replace(/[:.]/g, '-') + '_v' + payload.manifestVersion + '_' + payload.mode;
+    return payload;
+  }
+
+  window.postToDashboard = async function () {
+    const status = document.getElementById('export-status');
+    const payload = await buildPayload();
+    status.textContent = 'Submitting...';
     try {
       const resp = await fetch(DASHBOARD_URL + '/api/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await resp.json();
@@ -463,16 +489,7 @@ window._testTarget = 'remote';
 
   window.exportForDashboard = async function () {
     const status = document.getElementById('export-status');
-    const r = window._testResults;
-    const totalTests = r.totalPass + r.totalFail + r.totalSkip;
-    const payload = {
-      timestamp: new Date().toISOString(), mode: 'demo', runner: 'integration-remote',
-      completed: r.completed, totalPass: r.totalPass, totalFail: r.totalFail,
-      totalSkip: r.totalSkip, totalTests: totalTests, elapsed: r.elapsed,
-      passRate: totalTests > 0 ? Math.round((r.totalPass / totalTests) * 1000) / 10 : 0,
-      suites: r.suites.map(function (s) { return { name: s.name, totalTests: s.tests.length, pass: s.tests.filter(function (t) { return t.status === 'pass'; }).length, fail: s.tests.filter(function (t) { return t.status === 'fail'; }).length, skip: s.tests.filter(function (t) { return t.status === 'skip'; }).length, tests: s.tests }; }),
-    };
-    payload.id = payload.timestamp.replace(/[:.]/g, '-') + '_remote_demo';
+    const payload = await buildPayload();
     const json = JSON.stringify(payload, null, 2);
     try { await navigator.clipboard.writeText(json); status.textContent = 'Copied to clipboard!'; } catch (e) { status.textContent = 'Downloading...'; }
     const blob = new Blob([json], { type: 'application/json' });
