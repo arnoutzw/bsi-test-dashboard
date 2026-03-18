@@ -4,4 +4,4 @@ pages_build_output_dir = "."
 
 [[kv_namespaces]]
 binding = "BSI_DASHBOARD"
-id = ""  # Fill in after creating the KV namespace via: wrangler kv namespace create BSI_DASHBOARD
+id = "eacb7c5b7e29449eaf6dce144f0396d0"
