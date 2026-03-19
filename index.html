@@ -243,6 +243,16 @@
     </div>
   </div>
 
+  <!-- Quick Actions -->
+  <div style="display:flex;gap:12px;margin-bottom:32px;">
+    <button onclick="window.open('/runner','_blank')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:8px;background:var(--bg-primary);border:1px solid var(--border-light);color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border-light)'">
+      <i data-lucide="play" style="width:16px;height:16px;"></i> Run Integration Tests
+    </button>
+    <button onclick="showSection('runs', document.querySelector('#nav .nav-link:nth-child(2)'))" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:8px;background:var(--bg-primary);border:1px solid var(--border-light);color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border-light)'">
+      <i data-lucide="list" style="width:16px;height:16px;"></i> View All Runs
+    </button>
+  </div>
+
   <!-- Recent Events -->
   <div style="background:var(--bg-primary);border:1px solid var(--border-light);border-radius:8px;padding:20px;">
     <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Recent Events</div>
