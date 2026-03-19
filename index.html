@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <style>
   :root {
     --bg-body: #09090b; --bg-primary: #18181b; --bg-secondary: #27272a;
@@ -123,9 +125,48 @@
 
   .clickable-row { cursor: pointer; }
   .clickable-row:hover td { background: var(--bg-hover) !important; }
+
+  .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    background: var(--bg-body); }
+  .login-card { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 12px;
+    padding: 40px; text-align: center; max-width: 380px; width: 100%; }
+  .login-logo { width: 48px; height: 48px; background: var(--accent); border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+  .login-btn { display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 12px; border-radius: 8px; font-family: 'Inter', sans-serif;
+    font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); }
+  .login-btn:hover { border-color: var(--accent); background: var(--bg-hover); }
+  .login-btn svg { width: 18px; height: 18px; }
+  .user-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    border-radius: 6px; font-size: 12px; color: var(--text-muted); }
+  .user-bar img { width: 20px; height: 20px; border-radius: 50%; }
+  .signout-btn { background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 11px; font-family: 'JetBrains Mono', monospace; padding: 2px 6px;
+    border-radius: 4px; transition: color 0.2s; }
+  .signout-btn:hover { color: #f87171; }
 </style>
 </head>
 <body>
+
+<!-- Login Screen (shown when not authenticated) -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <i data-lucide="flask-conical" style="width:24px;height:24px;color:#09090b;"></i>
+    </div>
+    <h1 class="mono" style="font-size:20px;font-weight:800;margin-bottom:4px;">BSI Test Dashboard</h1>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:24px;">Sign in to access test results and analytics.</p>
+    <button class="login-btn" id="google-login-btn" onclick="signInWithGoogle()">
+      <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Sign in with Google
+    </button>
+    <p id="login-error" style="color:#f87171;font-size:12px;margin-top:12px;display:none;"></p>
+  </div>
+</div>
+
+<!-- Dashboard (hidden until authenticated) -->
+<div id="dashboard-app" style="display:none;">
 
 <!-- Sidebar -->
 <div class="sidebar">
@@ -160,6 +201,7 @@
     <button onclick="toggleTheme()" style="width:100%;padding:8px;border-radius:6px;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-muted);font-size:12px;cursor:pointer;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center;gap:6px;">
       <i data-lucide="sun-moon" style="width:14px;height:14px;"></i> Toggle Theme
     </button>
+    <div id="user-bar" class="user-bar" style="margin-top:8px;"></div>
   </div>
 </div>
 
@@ -409,7 +451,81 @@
   </div>
 </div>
 
+</div><!-- /dashboard-app -->
+
+<!-- Auth + App Init -->
 <script>
+(function () {
+  'use strict';
+
+  // ── Firebase Auth ──────────────────────────────────────────────────
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAJ6y1Jz8OHj2gbnWRZIk1TGZLcggvAMQ4",
+    authDomain: "arnout-s-homelab.firebaseapp.com",
+    projectId: "arnout-s-homelab",
+    storageBucket: "arnout-s-homelab.firebasestorage.app",
+    messagingSenderId: "258011834485",
+    appId: "1:258011834485:web:5afb1efaa303b4dd93f03c",
+  };
+
+  const fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = fbApp.auth();
+  const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+  window.signInWithGoogle = function () {
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'none';
+    auth.signInWithPopup(googleProvider).catch(function (err) {
+      if (err.code === 'auth/popup-blocked') {
+        // Fallback to redirect
+        auth.signInWithRedirect(googleProvider);
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    });
+  };
+
+  window.signOut = function () {
+    auth.signOut();
+  };
+
+  // Listen for auth state changes
+  auth.onAuthStateChanged(function (user) {
+    const loginScreen = document.getElementById('login-screen');
+    const dashboardApp = document.getElementById('dashboard-app');
+    const userBar = document.getElementById('user-bar');
+
+    if (user) {
+      loginScreen.style.display = 'none';
+      dashboardApp.style.display = 'block';
+
+      // Show user info in sidebar
+      if (userBar) {
+        userBar.innerHTML =
+          (user.photoURL ? '<img src="' + user.photoURL + '" alt="">' : '') +
+          '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (user.displayName || user.email) + '</span>' +
+          '<button class="signout-btn" onclick="signOut()">sign out</button>';
+      }
+
+      // Init dashboard
+      if (!window._dashboardInitialized) {
+        window._dashboardInitialized = true;
+        initDashboard();
+      }
+    } else {
+      loginScreen.style.display = 'flex';
+      dashboardApp.style.display = 'none';
+    }
+  });
+
+  // Handle redirect result
+  auth.getRedirectResult().catch(function () {});
+})();
+</script>
+
+<script>
+function initDashboard() {
 (function () {
   'use strict';
 
@@ -1339,6 +1455,10 @@
   lucide.createIcons();
   if (location.hash) setTimeout(handleHash, 500);
 })();
+} // end initDashboard
+
+// Init Lucide icons on login screen immediately
+lucide.createIcons();
 </script>
 </body>
 </html>
