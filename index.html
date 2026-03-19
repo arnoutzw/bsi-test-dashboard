@@ -235,6 +235,7 @@
           <th onclick="sortRuns('totalSkip')">Skip</th>
           <th onclick="sortRuns('passRate')">Rate</th>
           <th onclick="sortRuns('elapsed')">Duration</th>
+          <th style="width:40px;cursor:default;"></th>
         </tr>
       </thead>
       <tbody id="runs-body"></tbody>
@@ -643,6 +644,11 @@
         <td style="color:var(--text-muted);">${r.totalSkip || 0}</td>
         <td class="${rateClass(r.passRate)} mono" style="font-weight:600;">${r.passRate}%</td>
         <td style="color:var(--text-muted);">${formatDuration(r.elapsed)}</td>
+        <td onclick="event.stopPropagation()" style="text-align:center;">
+          <button onclick="deleteRun('${escapeAttr(r.id)}')" title="Delete run"
+            style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;border-radius:4px;font-size:14px;line-height:1;transition:color 0.2s;"
+            onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+        </td>
       </tr>
     `).join('');
 
@@ -670,6 +676,25 @@
       selectedRuns.delete(first);
     }
     renderRunsTable();
+  };
+
+  window.deleteRun = async function (id) {
+    if (!confirm('Delete this test run?\n\n' + id)) return;
+    try {
+      const resp = await fetch(API_BASE + '/api/run/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (resp.ok) {
+        // Remove from local state
+        runsIndex.runs = (runsIndex.runs || []).filter(r => r.id !== id);
+        delete runCache[id];
+        selectedRuns.delete(id);
+        renderAll();
+      } else {
+        const err = await resp.json();
+        alert('Delete failed: ' + (err.error || resp.status));
+      }
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
   };
 
   // ── Run Detail ─────────────────────────────────────────────────────
