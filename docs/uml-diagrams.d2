@@ -1,0 +1,594 @@
+# BSI Test Dashboard — UML Diagrams (D2)
+# Generated from: index.html, runner.html,
+#                  functions/api/runs.js, functions/api/run/[id].js,
+#                  functions/api/events.js, functions/api/webhook.js,
+#                  functions/api/manifests.js, scripts/submit-run.sh
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CLASSES
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class-diagram: Classes {
+
+  DashboardApp: DashboardApp (index.html) {
+    shape: class
+    sections: "string[]"
+    +_runs: "RunSummary[]"
+    +_currentRun: RunDetail
+    +_manifests: ManifestIndex
+    +_events: "WebhookEvent[]"
+    +_trendChart: Chart
+    +_passRateChart: Chart
+
+    showSection(name)
+    fetchRuns()
+    fetchRunDetail(id)
+    fetchManifest(version)
+    fetchEvents()
+    renderOverview()
+    renderRunsTable()
+    renderRunDetail()
+    renderCoverageMap()
+    renderTrends()
+    deleteRun(id)
+    signInWithGoogle()
+    signOut()
+  }
+
+  RemoteRunner: RemoteRunner (runner.html) {
+    shape: class
+    +_testResults: TestResults
+    +_manifestCache: Manifest
+    +_testMode: string
+    +_testTarget: string
+
+    runAll(opts)
+    buildPayload()
+    fetchManifest()
+    postToDashboard()
+    exportForDashboard()
+  }
+
+  InlineTestHarness: InlineTestHarness {
+    shape: class
+    suites: "Suite[]"
+    currentSuite: Suite
+
+    describe(name, fn)
+    it(name, fn, opts)
+    assert(condition, msg)
+    assertEqual(actual, expected, msg)
+    assertNotEqual(actual, notExpected, msg)
+    assertDeepEqual(actual, expected, msg)
+    assertIncludes(arr, item, msg)
+    assertGreaterThan(actual, threshold, msg)
+    assertAppLoaded(handle, msg)
+    runAll(opts)
+    wait(ms)
+  }
+
+  InlineIframeOrchestrator: InlineIframeOrchestrator {
+    shape: class
+    target: string
+    baseUrl: string
+    demoMode: boolean
+    handles: "AppHandle[]"
+
+    loadApp(appId)
+    unloadApp(handle)
+    unloadAll()
+    sendMessage(handle, msg)
+    waitForMessage(handle, type, timeout)
+    waitForAnyMessage(type, timeout)
+    evalInApp(handle, expr)
+    isSameOrigin(handle)
+    getBodyLength(handle)
+    getTheme(handle)
+  }
+
+  InlinePostMessageSpy: InlinePostMessageSpy {
+    shape: class
+    log: "MessageEntry[]"
+
+    getLog()
+    getMessages(type)
+    getLastMessage(type)
+    assertMessageSent(type, matcher)
+    assertNoMessage(type, timeout)
+    waitForMessage(type, timeout)
+    clear()
+  }
+
+  # ── Cloudflare Pages Functions ──
+
+  RunsAPI: /api/runs {
+    shape: class
+    env: CloudflareEnv
+
+    onRequestGet(env)
+    onRequestPost(request, env)
+  }
+
+  RunDetailAPI: /api/run/[id] {
+    shape: class
+    env: CloudflareEnv
+
+    onRequestGet(params, env)
+    onRequestDelete(params, env)
+  }
+
+  ManifestsAPI: /api/manifests {
+    shape: class
+    env: CloudflareEnv
+
+    onRequestGet(request, env)
+  }
+
+  EventsAPI: /api/events {
+    shape: class
+    env: CloudflareEnv
+
+    onRequestGet(env)
+  }
+
+  WebhookAPI: /api/webhook {
+    shape: class
+    env: CloudflareEnv
+
+    onRequestPost(request, env)
+    verifySignature(request, secret)
+  }
+
+  # ── Data Models ──
+
+  RunPayload: RunPayload {
+    shape: class
+    id: string
+    timestamp: string
+    mode: string
+    runner: string
+    hostname: string
+    completed: boolean
+    totalPass: number
+    totalFail: number
+    totalSkip: number
+    totalTests: number
+    elapsed: number
+    passRate: number
+    suites: "SuiteResult[]"
+    manifest: Manifest
+    manifestVersion: string
+    manifestDate: string
+  }
+
+  RunSummary: RunSummary {
+    shape: class
+    id: string
+    timestamp: string
+    version: string
+    mode: string
+    totalPass: number
+    totalFail: number
+    totalSkip: number
+    totalTests: number
+    passRate: number
+    elapsed: number
+  }
+
+  TestResults: TestResults {
+    shape: class
+    completed: boolean
+    totalPass: number
+    totalFail: number
+    totalSkip: number
+    elapsed: number
+    suites: "SuiteResult[]"
+  }
+
+  SuiteResult: SuiteResult {
+    shape: class
+    name: string
+    totalTests: number
+    pass: number
+    fail: number
+    skip: number
+    tests: "TestResult[]"
+  }
+
+  TestResult: TestResult {
+    shape: class
+    name: string
+    status: string
+    error: string
+    elapsed: number
+  }
+
+  ManifestIndex: ManifestIndex {
+    shape: class
+    versions: "ManifestVersionEntry[]"
+  }
+
+  ManifestVersionEntry: ManifestVersionEntry {
+    shape: class
+    version: string
+    date: string
+    repoCount: number
+  }
+
+  WebhookEvent: WebhookEvent {
+    shape: class
+    timestamp: string
+    type: string
+    repo: string
+    ref: string
+    commitHash: string
+    commitMessage: string
+    author: string
+    manifestChanged: boolean
+    version: string
+  }
+
+  SubmitRunScript: submit-run.sh {
+    shape: class
+    DASHBOARD_URL: string
+    MANIFEST_FILE: string
+    INPUT_FILE: string
+
+    validateJSON()
+    mergeManifest()
+    postToAPI()
+  }
+
+  # Relationships
+  DashboardApp -> RunsAPI: "GET /api/runs"
+  DashboardApp -> RunDetailAPI: "GET/DELETE /api/run/{id}"
+  DashboardApp -> ManifestsAPI: "GET /api/manifests"
+  DashboardApp -> EventsAPI: "GET /api/events"
+  RemoteRunner -> RunsAPI: "POST /api/runs"
+  RemoteRunner -> ManifestsAPI: "GET /api/manifests"
+  RemoteRunner -> InlineTestHarness: uses
+  RemoteRunner -> InlineIframeOrchestrator: uses
+  RemoteRunner -> InlinePostMessageSpy: uses
+  RunPayload -> SuiteResult: contains
+  SuiteResult -> TestResult: contains
+  TestResults -> SuiteResult: contains
+  ManifestIndex -> ManifestVersionEntry: contains
+  SubmitRunScript -> RunsAPI: "POST /api/runs via curl"
+  RunsAPI -> RunPayload: stores
+  RunsAPI -> RunSummary: indexes
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SEQUENCE: Test Run Submission Pipeline (runner -> dashboard -> KV)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+seq-main: Test Run Submission Pipeline {
+  shape: sequence_diagram
+
+  dev: Developer
+  runner: runner.html (Remote Runner)
+  harness: InlineTestHarness
+  orch: InlineIframeOrchestrator
+  cf_apps: Cloudflare Pages Apps
+  dashboard_api: /api/runs
+  manifests_api: /api/manifests
+  github_api: GitHub API
+  kv: Cloudflare KV (BSI_DASHBOARD)
+
+  dev -> runner: "Open runner.html"
+  runner -> harness: "Initialize inline test harness"
+  runner -> orch: "new IframeOrchestrator({target:'remote', demoMode:true})"
+
+  runner -> harness: "Register 4 inline suites (Smoke, SSO, Theme, Regression)"
+  runner -> runner: "runAll({suite: filterParam})"
+
+  harness -> orch: "orch.loadApp('scrum-app')"
+  orch -> cf_apps: "Create iframe src=https://scrum-app.pages.dev/?demo=true"
+  cf_apps -> orch: "iframe.onload (20s timeout)"
+  orch -> harness: "resolve(handle)"
+
+  harness -> orch: "orch.sendMessage(handle, {type:'admin-auth'})"
+  orch -> cf_apps: "postMessage to iframe"
+
+  harness -> harness: "assert(), assertAppLoaded()"
+  orch -> orch: "unloadApp(handle)"
+  harness -> runner: "return _testResults"
+
+  runner -> runner: "Render HTML results + summary bar"
+  runner -> runner: "Show export bar"
+
+  dev -> runner: "Click 'POST to Dashboard'"
+  runner -> runner: "buildPayload()"
+
+  runner -> manifests_api: "GET /api/manifests — fetch manifest index"
+  manifests_api -> kv: "KV.get('manifests:index')"
+  kv -> manifests_api: "{versions: [{version:'1.2.29', ...}]}"
+  manifests_api -> runner: "Return index"
+  runner -> manifests_api: "GET /api/manifests?version=1.2.29"
+  manifests_api -> kv: "KV.get('manifests:1.2.29')"
+  kv -> manifests_api: "Full manifest JSON"
+  manifests_api -> runner: "Return manifest"
+
+  runner -> runner: "Merge _testResults + manifest into payload"
+  runner -> dashboard_api: "POST /api/runs {payload}"
+
+  dashboard_api -> dashboard_api: "Validate required fields"
+  dashboard_api -> dashboard_api: "Generate ID: timestamp_vVersion_mode"
+  dashboard_api -> dashboard_api: "Compute passRate, enrich suite data"
+  dashboard_api -> kv: "KV.put('runs:{id}', fullRun)"
+  dashboard_api -> kv: "KV.get('runs:index')"
+  kv -> dashboard_api: "Existing index"
+  dashboard_api -> dashboard_api: "Prepend summary, deduplicate"
+  dashboard_api -> kv: "KV.put('runs:index', updatedIndex)"
+
+  dashboard_api -> kv: "KV.get('manifests:{version}') — check existing"
+  dashboard_api -> kv: "KV.put('manifests:{version}', manifest) — snapshot if new"
+  dashboard_api -> kv: "KV.put('manifests:index', updatedMIndex)"
+
+  dashboard_api -> runner: "201 {ok: true, id: 'run-id'}"
+  runner -> dev: "Submitted! ID: run-id"
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SEQUENCE: GitHub Webhook Processing
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+seq-secondary: GitHub Webhook Processing {
+  shape: sequence_diagram
+
+  github: GitHub
+  webhook: /api/webhook
+  kv: Cloudflare KV
+  github_content: GitHub Content API
+
+  github -> webhook: "POST /api/webhook (X-GitHub-Event: push)"
+  webhook -> webhook: "verifySignature(request, WEBHOOK_SECRET)"
+  webhook -> webhook: "Parse payload JSON"
+  webhook -> webhook: "Check: event=push, ref=refs/heads/main"
+  webhook -> webhook: "Check: "commits[]" modified release-manifest.json?"
+
+  webhook -> webhook: "Build logEntry: {type, repo, commitHash, author}"
+
+  webhook -> github_content: "GET repos/arnoutzw/bsi-devops/contents/release-manifest.json"
+  github_content -> webhook: "Raw JSON manifest"
+  webhook -> webhook: "Extract version from manifest"
+
+  webhook -> kv: "KV.get('manifests:{version}') — check existing"
+  webhook -> kv: "KV.put('manifests:{version}', manifest) — new snapshot"
+  webhook -> kv: "KV.get('manifests:index')"
+  kv -> webhook: "Existing index"
+  webhook -> webhook: "Prepend new version entry"
+  webhook -> kv: "KV.put('manifests:index', updatedIndex)"
+
+  webhook -> kv: "KV.get('events:log')"
+  kv -> webhook: "Existing event log"
+  webhook -> webhook: "Prepend logEntry, cap at 100 entries"
+  webhook -> kv: "KV.put('events:log', updatedLog)"
+
+  webhook -> github: "200 {ok: true, event: logEntry}"
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ARCHITECTURE
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+architecture: BSI Test Dashboard Architecture {
+
+  browser: Browser {
+    dashboard_ui: Dashboard SPA (index.html) {
+      overview: Overview Section
+      runs_list: Runs List
+      run_detail: Run Detail
+      manifest_view: Manifest Viewer
+      coverage_map: Coverage Map
+      trends: Trends (Chart.js)
+      settings: Settings
+    }
+    remote_runner: Remote Runner (runner.html) {
+      inline_harness: Inline TestHarness
+      inline_orch: Inline IframeOrchestrator
+      inline_spy: Inline PostMessageSpy
+      smoke_suite: Smoke Suite (All Apps Load)
+      sso_suite: SSO Chain Suite
+      theme_suite: Theme Propagation Suite
+      regression_suite: Regression Suite
+    }
+  }
+
+  firebase: Firebase Auth {
+    shape: cloud
+    tooltip: "Google Sign-In for dashboard access"
+  }
+
+  cloudflare: Cloudflare Pages {
+    static: Static Hosting {
+      tooltip: "index.html, runner.html"
+    }
+    functions: Pages Functions {
+      runs_api: /api/runs {
+        tooltip: "GET: list runs index; POST: submit new run"
+      }
+      run_detail_api: /api/run/[id] {
+        tooltip: "GET: full run detail; DELETE: remove run"
+      }
+      manifests_api: /api/manifests {
+        tooltip: "GET: list versions or get specific manifest"
+      }
+      events_api: /api/events {
+        tooltip: "GET: list webhook events"
+      }
+      webhook_api: /api/webhook {
+        tooltip: "POST: GitHub webhook receiver"
+      }
+    }
+    kv: Cloudflare KV (BSI_DASHBOARD) {
+      shape: cylinder
+      runs_index: "runs:index"
+      runs_data: "runs:{id}"
+      manifests_index: "manifests:index"
+      manifests_data: "manifests:{version}"
+      events_log: "events:log"
+    }
+  }
+
+  github: GitHub {
+    shape: cloud
+    bsi_devops: arnoutzw/bsi-devops {
+      tooltip: "Source of release-manifest.json"
+    }
+  }
+
+  cf_apps: BSI Apps (Cloudflare Pages) {
+    shape: cloud
+    style.multiple: true
+    tooltip: "30+ production PWAs tested by runner.html"
+  }
+
+  cli: CLI {
+    submit_script: submit-run.sh {
+      tooltip: "curl-based run submission from terminal"
+    }
+  }
+
+  # Frontend wiring
+  browser.dashboard_ui -> firebase: "Google Sign-In"
+  browser.dashboard_ui -> cloudflare.functions.runs_api: "Fetch runs"
+  browser.dashboard_ui -> cloudflare.functions.run_detail_api: "Fetch/delete run detail"
+  browser.dashboard_ui -> cloudflare.functions.manifests_api: "Fetch manifests"
+  browser.dashboard_ui -> cloudflare.functions.events_api: "Fetch webhook events"
+
+  # Runner wiring
+  browser.remote_runner -> cf_apps: "Load app iframes (cross-origin)"
+  browser.remote_runner -> cloudflare.functions.runs_api: "POST test results"
+  browser.remote_runner -> cloudflare.functions.manifests_api: "Fetch manifest for payload"
+  browser.remote_runner -> github.bsi_devops: "Fallback: fetch manifest from GitHub API"
+
+  # Backend wiring
+  cloudflare.functions -> cloudflare.kv: "Read/Write all data"
+  github.bsi_devops -> cloudflare.functions.webhook_api: "Push webhook"
+  cloudflare.functions.webhook_api -> github.bsi_devops: "Fetch manifest content"
+
+  # CLI wiring
+  cli.submit_script -> cloudflare.functions.runs_api: "POST via curl"
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# STATE DIAGRAMS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+states: State Diagrams {
+
+  dashboard_auth: Dashboard Authentication States {
+    unauthenticated: Login Screen
+    signing_in: Signing In (Google popup)
+    auth_error: Auth Error
+    authenticated: Dashboard Visible
+    loading_data: Loading Runs + Events
+    ready: Dashboard Ready
+
+    unauthenticated -> signing_in: "Click 'Sign in with Google'"
+    signing_in -> auth_error: "Auth rejected / popup blocked"
+    signing_in -> authenticated: "Firebase Auth success"
+    auth_error -> unauthenticated: "Show error, retry"
+    authenticated -> loading_data: "Fetch runs, events, manifests"
+    loading_data -> ready: "All data loaded"
+    ready -> unauthenticated: "Sign out"
+  }
+
+  test_run_lifecycle: Test Run Lifecycle {
+    idle: Runner Idle
+    loading_suites: Loading Inline Suites
+    running: Running Tests
+    loading_app: Loading App Iframe
+    iframe_loaded: Iframe Loaded
+    iframe_timeout: Iframe Timeout (20s)
+    sending_messages: Sending postMessages
+    asserting: Running Assertions
+    test_pass: Test Passed
+    test_fail: Test Failed
+    complete: All Tests Complete
+    building_payload: Building Export Payload
+    fetching_manifest: Fetching Manifest
+    posting: POSTing to Dashboard
+    submitted: Submitted to Dashboard
+    export_json: Exported as JSON
+
+    idle -> loading_suites: "Page loads"
+    loading_suites -> running: "setTimeout(runAll, 100)"
+    running -> loading_app: "orch.loadApp(appId)"
+    loading_app -> iframe_loaded: "iframe.onload"
+    loading_app -> iframe_timeout: "20s timeout"
+    iframe_loaded -> sending_messages: "sendMessage()"
+    sending_messages -> asserting: "Messages sent"
+    asserting -> test_pass: "All assertions pass"
+    asserting -> test_fail: "Assertion throws"
+    test_pass -> running: "Next test"
+    test_fail -> running: "Next test"
+    iframe_timeout -> running: "Next test (fail recorded)"
+    running -> complete: "All suites finished"
+    complete -> building_payload: "Click POST/Export"
+    building_payload -> fetching_manifest: "Fetch manifest"
+    fetching_manifest -> posting: "Click POST to Dashboard"
+    fetching_manifest -> export_json: "Click Export JSON"
+    posting -> submitted: "201 response"
+  }
+
+  webhook_event: Webhook Event Processing States {
+    received: Webhook Received
+    verifying: Verifying Signature
+    rejected: Signature Invalid (401)
+    parsing: Parsing Payload
+    parse_error: Invalid JSON (400)
+    checking_event: Checking Event Type
+    skipped_event: Not Push Event (skip)
+    skipped_branch: Not Default Branch (skip)
+    processing: Processing Push Event
+    manifest_check: Checking Manifest Changed
+    fetching_manifest: Fetching Manifest from GitHub
+    storing_manifest: Storing Manifest in KV
+    logging: Appending to Event Log
+    done: Response Sent (200)
+
+    received -> verifying: "Check X-Hub-Signature-256"
+    verifying -> rejected: "Signature mismatch"
+    verifying -> parsing: "Signature valid (or no secret)"
+    parsing -> parse_error: "Invalid JSON body"
+    parsing -> checking_event: "Payload parsed"
+    checking_event -> skipped_event: "event != push"
+    checking_event -> processing: "event == push"
+    processing -> skipped_branch: "ref not /main or /master"
+    processing -> manifest_check: "Default branch push"
+    manifest_check -> fetching_manifest: "release-manifest.json modified"
+    manifest_check -> logging: "No manifest change"
+    fetching_manifest -> storing_manifest: "Manifest fetched"
+    storing_manifest -> logging: "Manifest stored in KV"
+    logging -> done: "Event log updated, response sent"
+  }
+
+  run_storage: Run Storage States {
+    submitted: Run Submitted (POST)
+    validating: Validating Fields
+    invalid: Missing Fields (400)
+    generating_id: Generating Run ID
+    enriching: Enriching Suite Data
+    storing_run: Storing Full Run in KV
+    updating_index: Updating Run Index
+    snapshotting_manifest: Snapshotting Manifest (if new version)
+    stored: Run Stored (201)
+    fetched: Run Fetched (GET)
+    deleting: Deleting Run
+    deleted: Run Deleted
+
+    submitted -> validating: "Parse request body"
+    validating -> invalid: "Missing required fields"
+    validating -> generating_id: "Fields valid"
+    generating_id -> enriching: "ID generated"
+    enriching -> storing_run: "passRate + suite stats computed"
+    storing_run -> updating_index: "KV.put('runs:{id}')"
+    updating_index -> snapshotting_manifest: "Index updated"
+    snapshotting_manifest -> stored: "Manifest snapshot done"
+    stored -> fetched: "GET /api/run/{id}"
+    stored -> deleting: "DELETE /api/run/{id}"
+    deleting -> deleted: "KV.delete + index updated"
+  }
+}
