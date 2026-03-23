@@ -62,14 +62,14 @@ if [[ -n "$MANIFEST_FILE" && -f "$MANIFEST_FILE" ]]; then
   RUN_JSON=$(echo "$RUN_JSON" | python3 -c "
 import json, sys
 run = json.load(sys.stdin)
-manifest = json.load(open('$MANIFEST_FILE'))
+manifest = json.load(open(sys.argv[1]))
 run['manifest'] = manifest
 if 'version' in manifest:
     run['manifestVersion'] = manifest['version']
 if 'date' in manifest:
     run['manifestDate'] = manifest['date']
 print(json.dumps(run))
-")
+" "$MANIFEST_FILE")
   echo "Merged manifest v$(echo "$MANIFEST_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('version','?'))")"
 fi
 

@@ -1,14 +1,19 @@
 // POST /api/webhook — GitHub webhook handler for bsi-devops
 // Tracks manifest changes and commit events
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Hub-Signature-256',
-};
+const ALLOWED_ORIGINS = ['https://blacksphereindustries.nl', 'https://www.blacksphereindustries.nl'];
+function getCorsHeaders(request) {
+  const origin = request?.headers?.get('Origin') || '';
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.pages.dev');
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Hub-Signature-256',
+  };
+}
 
-export async function onRequestOptions() {
-  return new Response(null, { headers: CORS_HEADERS });
+export async function onRequestOptions({ request }) {
+  return new Response(null, { headers: getCorsHeaders(request) });
 }
 
 async function verifySignature(request, secret) {
@@ -30,7 +35,7 @@ export async function onRequestPost({ request, env }) {
   // Verify GitHub webhook signature
   const secret = env.WEBHOOK_SECRET || '';
   if (secret && !(await verifySignature(request, secret))) {
-    return Response.json({ error: 'Invalid signature' }, { status: 401, headers: CORS_HEADERS });
+    return Response.json({ error: 'Invalid signature' }, { status: 401, headers: getCorsHeaders(request) });
   }
 
   const event = request.headers.get('X-GitHub-Event');
@@ -38,17 +43,17 @@ export async function onRequestPost({ request, env }) {
   try {
     payload = await request.json();
   } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400, headers: CORS_HEADERS });
+    return Response.json({ error: 'Invalid JSON' }, { status: 400, headers: getCorsHeaders(request) });
   }
 
   // Only process push events to default branch
   if (event !== 'push') {
-    return Response.json({ ok: true, skipped: 'Not a push event' }, { headers: CORS_HEADERS });
+    return Response.json({ ok: true, skipped: 'Not a push event' }, { headers: getCorsHeaders(request) });
   }
 
   const ref = payload.ref || '';
   if (!ref.endsWith('/main') && !ref.endsWith('/master')) {
-    return Response.json({ ok: true, skipped: 'Not default branch' }, { headers: CORS_HEADERS });
+    return Response.json({ ok: true, skipped: 'Not default branch' }, { headers: getCorsHeaders(request) });
   }
 
   // Check if release-manifest.json was modified
@@ -111,5 +116,5 @@ export async function onRequestPost({ request, env }) {
   if (eventLog.length > 100) eventLog.length = 100;
   await env.BSI_DASHBOARD.put('events:log', JSON.stringify(eventLog));
 
-  return Response.json({ ok: true, event: logEntry }, { status: 200, headers: CORS_HEADERS });
+  return Response.json({ ok: true, event: logEntry }, { status: 200, headers: getCorsHeaders(request) });
 }

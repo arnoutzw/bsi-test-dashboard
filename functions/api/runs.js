@@ -1,19 +1,24 @@
 // GET /api/runs — List all test runs (summary index)
 // POST /api/runs — Submit a new test run
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function onRequestOptions() {
-  return new Response(null, { headers: CORS_HEADERS });
+const ALLOWED_ORIGINS = ['https://blacksphereindustries.nl', 'https://www.blacksphereindustries.nl'];
+function getCorsHeaders(request) {
+  const origin = request?.headers?.get('Origin') || '';
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.pages.dev');
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestOptions({ request }) {
+  return new Response(null, { headers: getCorsHeaders(request) });
+}
+
+export async function onRequestGet({ request, env }) {
   const index = await env.BSI_DASHBOARD.get('runs:index', 'json');
-  return Response.json(index || { lastUpdated: null, runs: [] }, { headers: CORS_HEADERS });
+  return Response.json(index || { lastUpdated: null, runs: [] }, { headers: getCorsHeaders(request) });
 }
 
 export async function onRequestPost({ request, env }) {
@@ -21,14 +26,14 @@ export async function onRequestPost({ request, env }) {
   try {
     run = await request.json();
   } catch {
-    return Response.json({ error: 'Invalid JSON' }, { status: 400, headers: CORS_HEADERS });
+    return Response.json({ error: 'Invalid JSON' }, { status: 400, headers: getCorsHeaders(request) });
   }
 
   // Validate required fields
   const required = ['timestamp', 'totalPass', 'totalFail', 'totalTests', 'suites'];
   for (const field of required) {
     if (run[field] === undefined) {
-      return Response.json({ error: `Missing required field: ${field}` }, { status: 400, headers: CORS_HEADERS });
+      return Response.json({ error: `Missing required field: ${field}` }, { status: 400, headers: getCorsHeaders(request) });
     }
   }
 
@@ -98,5 +103,5 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  return Response.json({ ok: true, id: run.id }, { status: 201, headers: CORS_HEADERS });
+  return Response.json({ ok: true, id: run.id }, { status: 201, headers: getCorsHeaders(request) });
 }
